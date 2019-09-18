@@ -25,7 +25,7 @@ org $3FFFFF ; <- 1FFFFF
 db #$00 ; expand file to 2mb
 
 org $1FFFF8 ; <- FFFF8 timestamp rom
-db #$20, #$18, #$07, #$23 ; year/month/day
+db #$20, #$19, #$08, #$31 ; year/month/day
 
 ;================================================================================
 
@@ -34,11 +34,14 @@ db #$20, #$18, #$07, #$23 ; year/month/day
 !BLT = "BCC"
 !BGE = "BCS"
 
-!INVENTORY_SWAP = "$7EF38C"
-!INVENTORY_SWAP_2 = "$7EF38E"
+; Rando Specific SRAM assignments
+!SHOP_PURCHASE_COUNTS = "$7EF302" ;$7EF302 - $7EF33F (temporary home)
+!INVENTORY_SWAP = "$7EF38C" ; [w]
+!INVENTORY_SWAP_2 = "$7EF38E" ; [w]
+!ITEM_LIMIT_COUNTS = "$7EF390" ; $7EF390 - ????
 !NPC_FLAGS   = "$7EF410"
 !NPC_FLAGS_2 = "$7EF411"
-!MAP_OVERLAY = "$7EF414" ; [2]
+!MAP_OVERLAY = "$7EF414" ; [w]
 !PROGRESSIVE_SHIELD = "$7EF416" ; ss-- ----
 !HUD_FLAG = "$7EF416" ; --h- ----
 !FORCE_PYRAMID = "$7EF416" ; ---- p---
@@ -46,14 +49,20 @@ db #$20, #$18, #$07, #$23 ; year/month/day
 !SHAME_CHEST = "$7EF416" ; ---s ----
 !HAS_GROVE_ITEM = "$7EF416" ; ---- ---g general flags, don't waste these
 !HIGHEST_SWORD_LEVEL = "$7EF417" ; --- -sss
-!SRAM_SINK = "$7EF41E" ; <- change this
-!FRESH_FILE_MARKER = "$7EF4F0" ; zero if fresh file
 ;$7EF41A[w] - Programmable Item #1
 ;$7EF41C[w] - Programmable Item #2
 ;$7EF41E[w] - Programmable Item #3
+!SRAM_SINK = "$7EF41E" ; <- change this (conflicts with Programmable item 3)
 ;$7EF418 - Goal Item Counter
-;$7EF420 - $7EF466 - Stat Tracking Bank 1
+;$7EF419 - Service Sequence
+;$7EF420 - $7EF466 - Stat Tracking Bank 1 (overlaps with RNG Item Flags)
 ;$7EF450 - $7EF45F - RNG Item (Single) Flags
+;$7EF4A0 - $7EF4A7 - Service Request Block
+!FRESH_FILE_MARKER = "$7EF4F0" ; zero if fresh file
+;$700500 - $70050F - Extended File Name
+;$701000 - $70100F - Password (incorporate into log header)
+;$702000 - $702014 - Rom title copy (incorporate into log header)
+
 
 !MS_GOT = "$7F5031"
 !DARK_WORLD = "$7EF3CA"
@@ -66,17 +75,24 @@ db #$20, #$18, #$07, #$23 ; year/month/day
 !FORCE_HEART_SPAWN = "$7F5033";
 !SKIP_HEART_SAVE = "$7F5034";
 
-!INVENTORY_SWAP = "$7EF38C"
-!INVENTORY_SWAP_2 = "$7EF38E"
+; MSU-1
+!REG_MSU_FALLBACK_TABLE = $7F50A0   ; 8 bytes
+!REG_MSU_DELAYED_COMMAND = $7F50A9
+!REG_MSU_PACK_COUNT = $7F50AA
+!REG_MSU_PACK_CURRENT = $7F50AB
+!REG_MSU_PACK_REQUEST = $7F50AC
+!REG_SPC_LOADING = $7F50AD
+!REG_MUSIC_CONTROL = $012B
+;!REG_MUSIC_CONTROL = $012C
+!REG_MUSIC_CONTROL_REQUEST = $012C
 
-!ITEM_LIMIT_COUNTS = "$7EF390"
-!SHOP_PURCHASE_COUNTS = "$7EF3A0"
 ;================================================================================
 
 incsrc hooks.asm
 incsrc treekid.asm
 incsrc spriteswap.asm
 incsrc hashalphabethooks.asm
+incsrc sharedplayerpalettefix.asm
 
 ;org $208000 ; bank #$20
 org $A08000 ; bank #$A0
@@ -96,7 +112,6 @@ incsrc shopkeeper.asm
 incsrc bookofmudora.asm
 incsrc crypto.asm
 incsrc tablets.asm
-incsrc rupeelimit.asm
 incsrc fairyfixes.asm
 incsrc rngfixes.asm
 incsrc medallions.asm
@@ -126,7 +141,6 @@ incsrc capacityupgrades.asm
 incsrc timer.asm
 incsrc doorframefixes.asm
 incsrc music.asm
-incsrc hashalphabet.asm
 incsrc roomloading.asm
 incsrc icepalacegraphics.asm
 warnpc $A18000
@@ -147,6 +161,10 @@ org $A18800 ; static mapping area
 incsrc zsnes.asm
 warnpc $A19000
 
+org $A1A000 ; static mapping area. Referenced by front end. Do not move.
+incsrc invertedstatic.asm
+warnpc $A1A100
+
 org $A1FF00 ; static mapping area
 incsrc init.asm
 
@@ -154,7 +172,6 @@ org $A48000 ; code bank - PUT NEW CODE HERE
 incsrc glitched.asm
 incsrc hardmode.asm
 incsrc goalitem.asm
-incsrc compasses.asm
 incsrc openmode.asm
 incsrc quickswap.asm
 incsrc endingsequence.asm
@@ -166,6 +183,18 @@ incsrc boots.asm
 incsrc fileselect.asm
 incsrc playername.asm
 incsrc decryption.asm
+incsrc hashalphabet.asm
+incsrc inverted.asm
+incsrc invertedmaps.asm
+incsrc newhud.asm
+incsrc compasses.asm
+incsrc save.asm
+incsrc password.asm
+incsrc enemy_adjustments.asm
+incsrc hudtext.asm
+incsrc servicerequest.asm
+incsrc elder.asm
+incsrc toast.asm
 warnpc $A58000
 
 ;org $228000 ; contrib area
@@ -175,10 +204,11 @@ incsrc contrib.asm
 org $A38000
 incsrc stats/main.asm
 
-;incsrc sandbox.asm
-
 org $308000 ; bank #$30
 incsrc tables.asm
+
+; uncomment for inverted adjustments
+;incsrc sandbox.asm
 
 org $318000 ; bank #$31
 GFX_Mire_Bombos:
@@ -202,7 +232,7 @@ warnpc $31A000
 
 org $31A000
 GFX_HUD_Items:
-incbin c2807_v3.gfx
+incbin c2807_v4.gfx
 warnpc $31A800
 
 org $31A800
@@ -215,11 +245,6 @@ org $31B000
 GFX_HUD_Main:
 incbin c2e3e.gfx
 warnpc $31B800
-
-org $31B800
-GFX_Hash_Alphabet:
-incbin hashalphabet.chr.gfx
-warnpc $31C001
 
 org $31C000
 IcePalaceFloorGfx:
@@ -234,12 +259,21 @@ warnpc $31D001
 org $31D000
 FileSelectNewGraphics:
 incbin fileselect.chr.gfx
-warnpc $31F001
+warnpc $31E001
+
+org $31E000
+InvertedCastleHole: ;address used by front end. DO NOT MOVE!
+incbin sheet73.gfx
+warnpc $31E501
 
 org $338000
 GFX_HUD_Palette:
 incbin hudpalette.pal
-warnpc $348000
+warnpc $338041
+
+org $339000
+incbin sheet178.gfx
+warnpc $339600
 
 org $328000
 Extra_Text_Table:
@@ -279,10 +313,22 @@ warnpc $B08000
 ;$3A reserved for downstream use
 ;$3B reserved for downstream use
 ;$3F reserved for internal debugging
-;$7F5700 - $7F57FF reserved for downstream use
+;================================================================================
+;RAM 
+;$7EC900[0x1F00]: BIGRAM buffer
+;$7EF000[0x500]: SRAM mirror First 0x500 bytes of SRAM
+;$7F5000[0x800]: Rando's main free ram region
+;   See tables.asm for specific assignments
+;$7F6000[0x500]: Free RAM (reclaimed from damage table) Not allocated yet
+;$7F6500[0xB00]: SRAM mirror for last 0xB00 bytes of SRAM (extended sram)
+;$7F7667[0x6719] - free ram
 ;================================================================================
 ;SRAM Map
 ;$70:0000 ( 4K) Game state
+;  0000-04FF Vanilla Slot 1 (mirrored at 0x7EF000)
+;    See earlier in this file for rando specific assignments
+;  0500-0FFF Ext Slot 1 (not yet mirrored)
+;    See earlier in this file for rando specific assignments
 ;$70:1000 (20K) Log entries
 ;$70:6000 ( 8K) Scratch buffers
 ;================================================================================
@@ -356,6 +402,11 @@ UseImplicitRegIndexedLongJumpTable:
 org $008333
 Vram_EraseTilemaps_triforce:
 
+org $008913
+Sound_LoadLightWorldSongBank:
+org $00891D
+    .do_load
+
 org $00893D
 EnableForceBlank:
 
@@ -389,6 +440,11 @@ Mirror_InitHdmaSettings:
 org $01873A
 Dungeon_LoadRoom:
 
+org $02821E
+Module_PreDungeon:
+org $028296
+    .setAmbientSfx
+
 org $02A0A8
 Dungeon_SaveRoomData:
 
@@ -398,8 +454,11 @@ Dungeon_SaveRoomData_justKeys:
 org $02B861
 Dungeon_SaveRoomQuadrantData:
 
-org $02FD8A ; 17D8A - Bank07.asm: 3732 Note: Different bank
+org $02FD8A ; 17D8A - Bank0E.asm: 3732 Note: Different bank
 LoadGearPalettes_bunny:
+
+org $02FD95 ; 17D95 - Bank0E.asm: 3742 Note: Different bank
+LoadGearPalettes_variable:
 
 org $05A51D
 Sprite_SpawnFallingItem:
@@ -421,9 +480,6 @@ Sprite_ShowMessageFromPlayerContact:
 
 org $05E219
 Sprite_ShowMessageUnconditional:
-
-org $05FA8E
-Sprite_ShowMessageMinimal:
 
 org $05EC96
 Sprite_ZeldaLong:
@@ -473,6 +529,15 @@ Sprite_CheckIfPlayerPreoccupied:
 org $08C3AE
 Ancilla_ReceiveItem:
 
+org $08CE93
+Ancilla_BreakTowerSeal_draw_single_crystal:
+
+org $08CEC3
+Ancilla_BreakTowerSeal_stop_spawning_sparkles:
+
+org $08CF59
+BreakTowerSeal_ExecuteSparkles:
+
 org $08F710
 Ancilla_SetOam_XY_Long:
 
@@ -482,8 +547,14 @@ AddReceivedItem:
 org $098BAD
 AddPendantOrCrystal:
 
+org $098CFD
+AddWeathervaneExplosion:
+
 org $0993DF
 AddDashTremor:
+
+org $099D04
+AddAncillaLong:
 
 org $09AE64
 Sprite_SetSpawnedCoords:
@@ -531,11 +602,17 @@ Sound_SetSfx3PanLong:
 org $0DDB7F
 HUD_RefreshIconLong:
 
+org $0DDD32
+Equipment_UpdateEquippedItemLong:
+
 org $0DE01E ; 6E10E - equipment.asm : 787
 BottleMenu_movingOn:
 
 org $0DE346
 RestoreNormalMenu:
+
+org $0DE395
+Equipment_SearchForEquippedItemLong:
 
 org $0DE9C8
 DrawProgressIcons: ; this returns short
@@ -549,8 +626,17 @@ HUD_RebuildLong:
 org $0DFA88
 HUD_RebuildIndoor_Palace:
 
+org $0DFA88
+HUD_RebuildLong2:
+
 org $0EEE10
 Messaging_Text:
+
+org $0FFD94
+Overworld_TileAttr:
+
+org $1BC97C:
+Overworld_DrawPersistentMap16:
 
 org $1BED03
 Palette_Sword:
@@ -564,14 +650,17 @@ Palette_ArmorAndGloves:
 org $1BEE52
 Palette_Hud:
 
+org $1BEF96
+Palette_SelectScreen:
+
 org $1CFAAA
 ShopKeeper_RapidTerminateReceiveItem:
 
 org $1CF500
 Sprite_NullifyHookshotDrag:
 
-org $1CFD69
-Main_ShowTextMessage:
+org $1CF537
+Ancilla_CheckForAvailableSlot:
 
 org $1DE9B6
 Filter_MajorWhitenMain:

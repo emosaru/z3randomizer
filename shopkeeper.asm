@@ -219,7 +219,18 @@ SpritePrep_ShopKeeper:
 		LDA.b #$00
 	++
 	STA !SHOP_STATE
-	
+
+    ; If the item is $FF, make it not show (as if already taken)
+	LDA !SHOP_INVENTORY : CMP.b #$FF : BNE +
+		LDA !SHOP_STATE : ORA Shopkeeper_ItemMasks : STA !SHOP_STATE
+	+
+	LDA !SHOP_INVENTORY+4 : CMP.b #$FF : BNE +
+		LDA !SHOP_STATE : ORA Shopkeeper_ItemMasks+1 : STA !SHOP_STATE
+	+
+	LDA !SHOP_INVENTORY+8 : CMP.b #$FF : BNE +
+		LDA !SHOP_STATE : ORA Shopkeeper_ItemMasks+2 : STA !SHOP_STATE
+	+
+
 	PLP : PLY : PLX
 	
 	LDA.l !SHOP_TYPE : CMP.b #$FF : BNE +
@@ -254,7 +265,7 @@ RTS
 ;!SHOP_INVENTORY, X
 ;[id][$lo][$hi][purchase_counter]
 ;--------------------------------------------------------------------------------
-;!SHOP_PURCHASE_COUNTS = "$7EF3A0"
+;!SHOP_PURCHASE_COUNTS = "$7EF302"
 ;--------------------------------------------------------------------------------
 Shopkeeper_UploadVRAMTilesLong:
 	JSR.w Shopkeeper_UploadVRAMTiles
@@ -275,7 +286,44 @@ Shopkeeper_UploadVRAMTiles:
 		LDA #$80 : STA $4302 ; set bus A source address to tile buffer
 		LDA #$A1 : STA $4303
 		LDA #$7E : STA $4304
-		
+
+		LDA !SHOP_TYPE : AND.b #$10 : BNE .special
+		BRL .normal
+
+	.special
+
+		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
+		LDA #$40 : STA $2116 ; set VRAM register destination address
+		LDA #$5A : STA $2117
+		LDA #$01 : STA $420B ; begin DMA transfer
+
+		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
+		LDA #$40 : STA $2116 ; set VRAM register destination address
+		LDA #$5B : STA $2117
+		LDA #$01 : STA $420B ; begin DMA transfer
+
+		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
+		LDA #$60 : STA $2116 ; set VRAM register destination address
+		LDA #$5A : STA $2117
+		LDA #$01 : STA $420B ; begin DMA transfer
+
+		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
+		LDA #$60 : STA $2116 ; set VRAM register destination address
+		LDA #$5B : STA $2117
+		LDA #$01 : STA $420B ; begin DMA transfer
+
+		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
+		LDA #$80 : STA $2116 ; set VRAM register destination address
+		LDA #$5A : STA $2117
+		LDA #$01 : STA $420B ; begin DMA transfer
+
+		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
+		LDA #$80 : STA $2116 ; set VRAM register destination address
+		LDA #$5B : STA $2117
+		LDA #$01 : STA $420B ; begin DMA transfer
+		BRL .end
+
+	.normal
 		LDA #$40 : STA $4305 : STZ $4306 ; set transfer size to 0x40
 		LDA #$60 : STA $2116 ; set VRAM register destination address
 		LDA #$5C : STA $2117
@@ -306,6 +354,7 @@ Shopkeeper_UploadVRAMTiles:
 		LDA #$5D : STA $2117
 		LDA #$01 : STA $420B ; begin DMA transfer
 		;--------------------------------------------------------------------------------
+	.end
 		PLA : STA $4306 ; restore DMA parameters
 		PLA : STA $4305 ; restore DMA parameters
 		PLA : STA $4304 ; restore DMA parameters
@@ -404,11 +453,12 @@ dw 0, 0 : db <body>, $40, $00, $02
 endmacro
 ;--------------------------------------------------------------------------------
 Shopkeeper_DrawMerchant:
-	LDA.l !SHOP_MERCHANT : AND.b #$03
+	LDA.l !SHOP_MERCHANT : AND.b #$07
 	BEQ Shopkeeper_DrawMerchant_Type0
 	CMP.b #$01 : BNE + : BRL Shopkeeper_DrawMerchant_Type1 : +
 	CMP.b #$02 : BNE + : BRL Shopkeeper_DrawMerchant_Type2 : +
 	CMP.b #$03 : BNE + : BRL Shopkeeper_DrawMerchant_Type3 : +
+	CMP.b #$04 : BNE + : RTS : +
 ;--------------------------------------------------------------------------------
 Shopkeeper_DrawMerchant_Type0:
 %DrawMerchant(#$00, #$10, #$10)
@@ -536,7 +586,7 @@ db #$01, #$02, #$04
 ;--------------------
 ;!SHOP_ID = "$7F5050"
 ;!SHOP_SRAM_INDEX = "$7F5062"
-;!SHOP_PURCHASE_COUNTS = "$7EF3A0"
+;!SHOP_PURCHASE_COUNTS = "$7EF302"
 ;--------------------
 Setup_ShopItemCollisionHitbox:
 ;The complications with XBA are to handle the fact that nintendo likes to store
@@ -683,6 +733,13 @@ Shopkeeper_DrawNextItem:
 	.potion
 		LDA.b #$C0 ; potion is #$C0 because it's already there in VRAM
 	+
+	XBA
+
+	LDA !SHOP_TYPE : AND.b #$10 : BEQ +
+		XBA : !SUB #$22 : XBA ; alt vram
+	+
+	XBA
+
 	STA.l !SPRITE_OAM+4
 
 	LDA.l !SHOP_INVENTORY, X ; get item palette
@@ -749,19 +806,22 @@ Shopkeeper_DrawNextPrice:
 		INY : LDA ($02), Y : STA !COLUMN_HIGH
 	PLY
 	LDA.l !SHOP_INVENTORY+1, X : STA $0C ; set value
-	JSR.w DrawPrice
-	SEP #$20 : STA $06 : STZ $07 ; set 8-bit accumulator & store result
-	PHA
-		LDA.b #!BIGRAM : STA $08
-		LDA.b #!BIGRAM>>8 : STA $09
-		LDA.b #$7E : PHA : PLB ; set data bank to $7E
+	
+	BEQ .free
+		JSR.w DrawPrice
+		SEP #$20 : STA $06 : STZ $07 ; set 8-bit accumulator & store result
+		PHA
+			LDA.b #!BIGRAM : STA $08
+			LDA.b #!BIGRAM>>8 : STA $09
+			LDA.b #$7E : PHA : PLB ; set data bank to $7E
 
-		PHX : PHA : LDA !SCRATCH_TEMP_X : TAX : PLA : JSL.l Sprite_DrawMultiple_quantity_preset : PLX
+			PHX : PHA : LDA !SCRATCH_TEMP_X : TAX : PLA : JSL.l Sprite_DrawMultiple_quantity_preset : PLX
 		
-		LDA 1,s
-		ASL #2 : !ADD $90 : STA $90 ; increment oam pointer
-	PLA
-	!ADD $92 : STA $92
+			LDA 1,s
+			ASL #2 : !ADD $90 : STA $90 ; increment oam pointer
+		PLA
+		!ADD $92 : STA $92
+	.free
 	PLP : PLY : PLX
 	PLB
 RTS

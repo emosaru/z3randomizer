@@ -4,6 +4,8 @@
 org $00802F ; <- 2F - Bank00.asm : 45
 JSL.l Init_Primary
 NOP
+org $0CC1AC ; <- 63 D4 00 - Bank0C.asm:8 (dl Tagalong_LoadGfx)
+dl Init_PostRAMClear
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -75,12 +77,37 @@ JSL.l OnQuit
 ;================================================================================
 ; Title Screen
 ;--------------------------------------------------------------------------------
+org $0CCDA5 ; <- Bank0C.asm : 1650 (JSL Palette_SelectScreen)
+JSL.l SetFileSelectPalette
+;--------------------------------------------------------------------------------
 org $0CCE41 ; <- 64E41 - Bank0C.asm : 1907 (DEC $C8 : BPL .done)
-LDA $C8 : EOR.b #$04  : STA $C8 : NOP #2 ; set cursor to only select first file and erase
+JSL FSCursorUp : NOP #4 ; set cursor to only select first file and erase
 org $0CCE50 ; <- 64E50 - Bank0C.asm : 1918 (INC $C8)
-LDA $C8 : EOR.b #$04  : STA $C8 : NOP #4 ; set cursor to only select first file and erase
+JSL FSCursorDown : NOP #6 ; set cursor to only select first file and erase
 org $0CCE0F ; < 64E0F - Bank0C.asm : 1880 (LDX $00 : INX #2 : CPX.w #$0006 : BCC .nextFile)
 NOP #9 ; don't draw the other two save files
+;--------------------------------------------------------------------------------
+org $0CCE71 ; <- Bank0C.asm : 1941 (LDA.b #$F1 : STA $012C)
+JML.l FSSelectFile : NOP
+FSSelectFile_continue:
+org $0CCEB1 ; <- Bank0C.asm : 2001 (.return)
+FSSelectFile_return:
+;--------------------------------------------------------------------------------
+; Replace copy file module with a fully custom module
+org $008061+$02 ; <- Bank00.asm : 103 (dl Module_CopyFile)
+db Module_Password
+org $00807D+$02 ; <- Bank00.asm : 103 (dl Module_CopyFile)
+db Module_Password>>8
+org $008099+$02 ; <- Bank00.asm : 103 (dl Module_CopyFile)
+db Module_Password>>16
+
+; Hook up password screen tilemap
+org $00937a+$07
+db Password_Tilemap
+org $009383+$07
+db Password_Tilemap>>8
+org $00938c+$07
+db Password_Tilemap>>16
 ;--------------------------------------------------------------------------------
 org $0CD527 ; <- 65527 : Bank0C.asm : 2913 (LDA.w #$0004 : STA $02) [LDA.w #$0006 : STA $02]
 JSL.l DrawPlayerFile : NOP ; hijack hearts draw routine to draw a full inventory
@@ -105,14 +132,23 @@ LDA.w #$0180 ; change which character is used as the blank character for the sel
 org $0CD50C ; <- 6550C  (Not in disassembly, would be in bank0c.asm if it were) Position table for Name and Hearts
 ;dw $0012, $0112, $0212 ; vanilla-ish positions of file names
 ;dw $0026, $0126, $0226 ; vanilla-ish positions of hearts names
-dw $00C8, $014A, $01CA ; repositioned, only the first value matters
+dw $00CC, $014A, $01CA ; repositioned, only the first value matters
 dw $002A, $0192, $0112
 org $0CD53B ; <- 6553B : Bank0c.asm : 2919 (ADD.w #$0010 : STA $102C, Y) [... : STA $1034, Y]
 STA.w $1042, Y ; Make 2nd half of names line up properly
-;org $0CD540 ; <- 65540 : Bank0c.asm : 2923 (INY #2) [INY #4]
-;NOP #2 ; Remove space between name characters
+org $0CD540 ; <- 65540 : Bank0c.asm : 2923 (INY #2) [INY #4]
+NOP #2 ; Remove space between name characters
 org $0CD571 ; <- 65571 : Bank0c.asm : 2943 (LDA $04 : ADD.w #$002A : TAY) [... : ADD.w #$0032 : ...]
 ADC.w #$0040 ;make Hearts line up properly
+;--------------------------------------------------------------------------------
+org $0CCC67 ; <- (Not in disassembly, would be in bank0c.asm if it were) Y position table for File select fairy
+db $42, $00, $00, $AF, $C7
+org $0CD308 ; <- (Not in disassembly, would be in bank0c.asm if it were) Y position table for File Delete fairy
+db $42, $00, $00, $C7
+org $0CD57E ; <- Y position table for File select link sprite
+db $3d
+org $0CD6BD ; <- Y position table for Death Counts
+db $51
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -181,9 +217,65 @@ SKIP 7 : NOP #3
 SKIP 7 : NOP #3
 SKIP 7 : NOP #3
 ;--------------------------------------------------------------------------------
-; Clearing mirrored copy on file erase
-org $0CD4E7 ; <- 654E7 - Bank0C.asm : 2282 (STA $700400, X : STA $700F00, X : STA $701000, X : STA $701100, X)
-NOP #20
+; remove Clearing mirrored copy on file erase, instead clearing the extended save file too
+org $0CD4E3 ; <- Bank0C.asm : 2282 (STA $700400, X : STA $700F00, X : STA $701000, X : STA $701100, X)
+JSL.l ClearExtendedSaveFile
+BRA +
+	NOP #18
++
+;--------------------------------------------------------------------------------
+
+;================================================================================
+; Extended SRAM Save file
+;--------------------------------------------------------------------------------
+org $0ccf08 ; <- Bank0C.asm : 2036 (LDA.w #$0007 : STA $7EC00D : STA $7EC013)
+JSL CopyExtendedSaveFileToWRAM
+;--------------------------------------------------------------------------------
+org $008998 ; <- Bank00.asm : 1296 (LDX.w #$0000)
+JSL CopyExtendedWRAMSaveFileToSRAM
+;--------------------------------------------------------------------------------
+org $0CD7AB ; <- Bank0C.asm : 3342 (STA $700400, X)
+JSL.l ClearExtendedSaveFile
+;--------------------------------------------------------------------------------
+org $0CC2EB ; <- Bank0C.asm : 348 (STA $7EF000, X : STA $7EF100, X : STA $7EF200, X : STA $7EF300, X : STA $7EF400, X)
+JSL.l ClearExtendedWRAMSaveFile
+;--------------------------------------------------------------------------------
+org $09F653 ; <- module_death.asm : 556 (STA $7EF400, X)
+JSL.l ClearExtendedWRAMSaveFile
+;--------------------------------------------------------------------------------
+
+;================================================================================
+; Remove storage of selected file index from end of vanilla SRAM
+;--------------------------------------------------------------------------------
+org $0087EB ; <- Bank00.asm : 986 (STA $7EC500 : STA $701FFE)
+BRA AfterFileWrittenChecks
+;Also skip totally redundant checking and clearing the "file written" marker,
+;since it is not even useful in the original code, much less with only one save slot
+org $00881f ; <- Bank00.asm : 1011 (STY $01FE)
+AfterFileWrittenChecks:
+;--------------------------------------------------------------------------------
+org $008951 ; <- Bank00.asm : 1278 (LDX $1FFE : LDA $00848A, X : TAY : PHY)
+LDX #$0002
+;--------------------------------------------------------------------------------
+org $0CCE85 ; <- Bank0C.asm : 1953 (LDA $C8 : ASL A : INC #2 : STA $701FFE)
+NOP #4
+;--------------------------------------------------------------------------------
+org $0CDB4C ; <- Bank0C.asm : 3655 (LDA $C8 : ASL A : INC #2 : STA $701FFE : TAX)
+NOP #4
+;--------------------------------------------------------------------------------
+org $09F5EA ; <- module_death.asm : 510 (LDA $701FFE : TAX : DEX #2)
+LDA.w #$0002 : NOP
+;--------------------------------------------------------------------------------
+org $0EEFEB ; <- vwf.asm : 310 (LDA $701FFE : TAX)
+LDA.w #$0002 : NOP
+;--------------------------------------------------------------------------------
+
+;================================================================================
+; Cross World Damage fixes
+;--------------------------------------------------------------------------------
+org $068891 ; Sprite_Prep.asm : 378 //LDA .damage_class, Y : STA $0CD2, X
+nop #$08
+JSL.l NewBatInit
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -225,9 +317,6 @@ JSL.l LoadBombCount16
 org $0DDEB3 ; <- 6DEB3 - equipment.asm : 328 (LDA $7EF33F, X)
 JSL.l IsItemAvailable
 ;--------------------------------------------------------------------------------
-org $0DFC5B ; <- 6FC5B - headsup_display.asm : 839 (LDA .mp_tilemap+0, X : STA $7EC746)
-JSL.l DrawMagicMeter : JMP.w + : NOP #21 : +
-;--------------------------------------------------------------------------------
 
 ;================================================================================
 ; Inverted Mode
@@ -242,6 +331,66 @@ JSL.l DecideIfBunnyByScreenIndex : db #$D0 ; BNE
 ;--------------------------------------------------------------------------------
 org $02D9B9 ; <- 159B9 - Bank02.asm : 11089  (LDA $7EF3C8)
 JSL AllowStartFromSingleEntranceCave
+;--------------------------------------------------------------------------------
+org $028496 ; <- 15496 - Bank02.asm : 959  (LDA $7EF3C8 : PHA)
+JML.l AllowStartFromExit
+AllowStartFromExitReturn:
+;--------------------------------------------------------------------------------
+org $1bc2a7 ; <- DC2A7 - Bank1B.asm : 1143 (Overworld_CreatePyramidHole:)
+JSL.l Overworld_CreatePyramidHoleModified
+RTL
+C9DE_LONG:
+JSR $C9DE ; surprisingly same address as US
+RTL
+;--------------------------------------------------------------------------------
+org $07ff5f ; <- 3ff5f - Bank0E.asm : 5252 (LDA.w #$0E3F : STA $23BC)
+JSL.l Draw_PyramidOverlay
+RTS
+;--------------------------------------------------------------------------------
+;Remove Electric Barrier Hook
+org $06891E ; <- sprite_prep.asm : 537 (LDA $7EF280, X : PLX : AND.b #$40 : BEQ .not_dead)
+JSL Electric_Barrier
+;--------------------------------------------------------------------------------
+org $08CDAC ; <- ancilla_break_tower_seal.asm : 117 (LDA.b #$05 : STA $04C6)
+JSL GanonTowerAnimation
+NOP #05
+;--------------------------------------------------------------------------------
+org $1AF5C1 ; <- sprite_waterfall.asm : 40 (LDA $8A : CMP.b #$43)
+JSL GanonTowerInvertedCheck
+;--------------------------------------------------------------------------------
+org $02EC8D ; <- bank02.asm : 11981 (LDA.w #$020F : LDX $8A : CPX.w #$0033 : BNE .noRock)
+JSL HardcodedRocks
+NOP #19 ;23 bytes removed with the JSL
+;--------------------------------------------------------------------------------
+org $04E7AE ; <- bank0E.asm : 4230 (LDA $7EF287 : AND.w #$0020)
+JSL.l TurtleRockPegSolved
+;--------------------------------------------------------------------------------
+org $1BBD05 ; <- bank1B.asm : 261 (TYA : STA $00) ; hook starts at the STA
+JML.l PreventEnterOnBonk
+NOP
+PreventEnterOnBonk_return:
+org $1BBD77 ; <- bank1B.asm : 308 (SEP #$30)
+PreventEnterOnBonk_BRANCH_IX:
+;--------------------------------------------------------------------------------
+
+;================================================================================
+; Crystals Mode
+;--------------------------------------------------------------------------------
+org $099B7B ; <- ancilla_init.asm : 4136 (LDA $7EF37A : AND.b #$7F : CMP.b #$7F)
+JSL.l CheckEnoughCrystalsForTower
+NOP #4
+db #$90 ; BCC
+;--------------------------------------------------------------------------------
+org $08CE0C ; <- 44E0C - ancilla_break_tower_seal.asm : 168 (BEQ #$03 : JSR BreakTowerSeal_ExecuteSparkles : LDX.b #$06)
+JML.l GetRequiredCrystalsForTower
+NOP #3
+GetRequiredCrystalsForTower_continue:
+;--------------------------------------------------------------------------------
+org $08CF19 ; <- 44F19 - ancilla_break_tower_seal.asm : 336 (TXA : AND.b #$07 : TAX)
+JSL.l GetRequiredCrystalsInX
+;--------------------------------------------------------------------------------
+org $08CFC9 ; <- 44FC9 - ancilla_break_tower_seal.asm : 414 (RTS)
+db #$6B
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -432,6 +581,12 @@ NOP #2
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
+; Wallmaster camera fix
+;--------------------------------------------------------------------------------
+org $1EAF77 ; <- F2F77 sprite_wallmaster.asm : 141 (LDA.b #$2A : JSL Sound_SetSfx3PanLong)
+JSL.l WallmasterCameraFix
+
+;================================================================================
 ; Hard & Masochist Mode Fixes
 ;--------------------------------------------------------------------------------
 org $07D22B ; <- 3D22B - Bank05.asm : 12752 (LDA $D055, Y : STA $0373)
@@ -449,11 +604,8 @@ JSL.l CalculateCapeUsage
 org $08DCA7 ; <- 45CA7 - ancilla_cane_spark.asm : 256 (LDA.b #$01 : STA $037B)
 JSL.l ActivateInvulnerabilityOrDont : NOP
 ;--------------------------------------------------------------------------------
-org $06EF1B ; <- 36F1B - Bank06.asm : 5100 (TYA : STA $7FFA3C, X : BEQ BRANCH_DELTA)
-db #$27
-;--------------------------------------------------------------------------------
-org $06EF43 ; <- 36F43 - Bank06.asm : 5117 (LDA.b #$40 : STA $0DF0, X)
-JSL CheckStunItemAction : NOP
+ORG $06EDC6 ;  <- 36DC6 - Bank06.asm : 4890 (LDA $0DB8F1, X)
+JSL.l GetItemDamageValue
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -628,6 +780,18 @@ JSL.l LoadModifiedMagicLevel : !ADD.w LinkItem_MagicCostBaseIndices, X
 ;--------------------------------------------------------------------------------
 org $07B0D5 ; <- 3B0D5 - Bank07.asm : 7783 (LDA LinkItem_MagicCostBaseIndices, X : CLC : ADC $7EF37B : TAX)
 JSL.l LoadModifiedMagicLevel : !ADD.w LinkItem_MagicCostBaseIndices, X
+;--------------------------------------------------------------------------------
+
+;================================================================================
+; Faster Great Fairies
+;--------------------------------------------------------------------------------
+org $06C83D ; <- sprite_ponds.asm : 784 ( LDA.b #$FF : STA $0DF0, X )
+db $30 ; (any faster and she appears as link is still throwing the bottle)
+;--------------------------------------------------------------------------------
+org $06C896 ; <- sprite_ponds.asm : 844 ( LDA $1A : AND.b #$07 : BNE BRANCH_ALPHA )
+db $03 ; fade in speed. Should be power of 2 minus 1
+org $06C985 ; <- sprite_ponds.asm : 1025 ( LDA $1A : AND.b #$07 : BNE BRANCH_ALPHA )
+db $03 ; fade out speed. Should be power of 2 minus 1
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -1062,6 +1226,17 @@ _ancilla_quake_spell_83:
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
+; Animated Entrances
+;--------------------------------------------------------------------------------
+org $1BCAC4 ; <- Bank1B.asm : 1537 (STA $02E4 ; Link can't move.)
+JSL AnimatedEntranceFix
+BNE +
+	RTL
+	NOP #2
++
+;--------------------------------------------------------------------------------
+
+;================================================================================
 ; Big & Great Fairies
 ;--------------------------------------------------------------------------------
 org $1DC475 ; <- EC475 - sprite_big_fairie.asm : 70 (LDA.w #$00A0 : ADD $7EF372 : STA $7EF372)
@@ -1171,33 +1346,23 @@ JSL.l RNG_Trinexx
 ;================================================================================
 ; HUD Changes
 ;--------------------------------------------------------------------------------
-org $0DFC77 ; <- 6FC77 - headsup_display.asm : 845
-NOP #$2D ; #45
-org $0DFC77 ; <- 6FC77 - yes these are both the correct address - kkat
-JSL.l OnDrawHud
-BRA $27
+org $0DFC4C ; <- 6FC4C - headsup_display.asm : 836 (LDA $7EF36E : AND.w #$00FF : ADD.w #$0007 : AND.w #$FFF8 : TAX)
+JML.l OnDrawHud
+NOP #197
+ReturnFromOnDrawHud:
+SEP #$30
+LDX.b #$FF ; vanilla hud code ends with #$FF in X, and it's required for unknown reasons.
 
-org $0DFCB8 ; <- 6FCB8
-JSL.l DrawBombTens ; nudge bomb 10s digit right
-
-org $0DFCC4 ; <- 6FCC4
-JSL.l DrawBombOnes ; nudge bomb 1s digit right
-
-org $0DFCDC ; <- 6FCDC
-JSL.l DrawArrowTens
-
-org $0DFCE8 ; <- 6FCE8
-JSL.l DrawArrowOnes
 
 ;org $0DFD0A ; <- 6FD0A - headsup_display.asm : 900
 ;STA $7EC766 ; nudge key digit right
 
-org $0DFD13 ; <- 6FD13 - headsup_display.asm : 905
-STA $7EC726 ; key icon blank
+;org $0DFD13 ; <- 6FD13 - headsup_display.asm : 905
+;STA $7EC726 ; key icon blank
 
 org $0DFC37 ; <- 6FC37 - headsup_display.asm : 828 (LDA.w #$28F7)
 JSL.l DrawMagicHeader
-NOP #17
+BRA + : NOP #15 : +
 ;--------------------------------------------------------------------------------
 org $0DFB29 ; <- headsup_display.asm : 688 (LDA.b #$86 : STA $7EC71E)
 ;LDA.b #$86 : STA $7EC720 ; nudge silver arrow right - remember to update this in newit
@@ -1261,15 +1426,6 @@ JSL.l GetAgahnimLightning
 ;--------------------------------------------------------------------------------
 org $0287E0 ; <- 107E0 - Bnak02.asm:1507 (LDA $0112 : ORA $02E4 : ORA $0FFC : BEQ .allowJoypadInput)
 JSL.l AllowJoypadInput : NOP #5
-;--------------------------------------------------------------------------------
-; OWG sign on EDM
-;--------------------------------------------------------------------------------
-org $02EC2E ; Bank02.asm : 11919 LDX.w #$001E
-JSL AddSignToEDMBridge : NOP #$02
-;--------------------------------------------------------------------------------
-org $02ED51 ; Bank02.asm : 12113 LDX.w #$001E
-JSL AddSignToEDMBridge : NOP #$02
-;--------------------------------------------------------------------------------
 
 ;================================================================================
 ; Half Magic Bat
@@ -1282,13 +1438,32 @@ JSL.l GetMagicBatItem
 ; MSU Music
 ;--------------------------------------------------------------------------------
 org $0080D7 ; <- D7 - Bank00.asm:172 (SEP #$30)
-spc_nmi:
-    JML msu_main
-    NOP
+JML msu_main : NOP
 spc_continue:
 
-org $0EE6EC ; <- E220 A922 - Bank0E.asm:2892 (SEP #$20)
+org $08C421 ; <- AD4021 F005 - ancilla_receive_item.asm:108 (LDA $2140 : BEQ .wait_for_music)
+JML pendant_fanfare : NOP
+pendant_continue:
+
+org $08C42B
+pendant_done:
+
+org $08C62A ; <- AD4021 D008 - ancilla_receive_item.asm:442 (LDA $2140 : BNE .waitForSilence)
+JML crystal_fanfare : NOP
+crystal_done:
+
+org $08C637
+crystal_continue:
+
+org $0EE6EC ; <- E220 A922 - Bank0E.asm:2892 (SEP #$20 : LDA.b #$22 : STA $012C)
 JSL.l ending_wait
+
+; Process music commands in NMI from new location after muting is processed
+org $0080DD
+dw !REG_MUSIC_CONTROL
+
+org $008101
+dw !REG_MUSIC_CONTROL
 ;--------------------------------------------------------------------------------
 
 ;================================================================================
@@ -1367,12 +1542,6 @@ JSL.l HUDRebuildIndoor : NOP #4
 org $029A35 ; <- 11A35 : Bank02.asm:4789 - (JSL HUD.RebuildIndoor.palace)
 JSL.l HUDRebuildIndoorHole
 ;--------------------------------------------------------------------------------
-org $0DFCEC ; <- 6FCEC : headsup_display.asm:887 - (LDA.w #$007F : STA $05)
-LDA.w #$7F7F : STA $04 ; Have both key digits default to blank
-
-org $0DFD02 ; <- 6FD02 ; headsup_display.asm:900 - (LDA $05 : AND.w #$00FF : ORA.w #$2400 : STA $7EC764)
-JSL.l DrawKeyIcon : NOP #8
-;--------------------------------------------------------------------------------
 
 ;================================================================================
 ; Pendant / Crystal Fixes
@@ -1381,6 +1550,12 @@ JSL.l DrawKeyIcon : NOP #8
 ;;LDA $7EF3CA : CMP.b #$40 ; check for dark world instead
 ;JSL.l CheckPendantHUD
 ;NOP #2
+;================================================================================
+org $098BB0 ; <- 048BB0 - ancilla_init.asm:1663 - (STX $02D8 : JSR AddAncilla)
+JSL.l TryToSpawnCrystalUntilSuccess
+NOP
+org $01C74B ; <- 00C74B - bank01.asm:10368 - (STZ $AE, X)
+NOP #2 ; this STZ is what makes the crystal never spawn if it fails to spawn on the first try
 ;================================================================================
 org $0DE9C8 ; <- 6E9C8 - equipment.asm:1623 - (LDA $7EF3C5 : CMP.b #$03 : BCC .beforeAgahnim)
 JSL.l DrawPendantCrystalDiagram : RTS
@@ -1410,7 +1585,7 @@ org $0DEA15 ; <- 6EA15 - equipment.asm:1647 - (LDA.w #$13B2 : STA $00)
 org $00F97E ; <- 797E - Bank00.asm:8586 - (LDA $7EF3CA : EOR.b #$40 : STA $7EF3CA)
 JSL.l FlipLWDWFlag : NOP #6
 ;================================================================================
-org $02B162 ; <- 13162 - Bank02.asm:7672 - (LDA $7EF3CA : EOR.b #$40 : STA $7EF3CA)
+org $02B15C ; <- 1315C - Bank02.asm:7672 - (LDA $7EF3CA : EOR.b #$40 : STA $7EF3CA)
 JSL.l IncrementOWMirror
 JSL.l FlipLWDWFlag
 NOP #2
@@ -1536,9 +1711,9 @@ JSL.l DialogGanon1
 org $1D9078 ; <- E9078 - sprite_ganon.asm:552 (LDA.b #$70 : STA $1CF0)
 JSL.l DialogGanon2 : RTS
 ;--------------------------------------------------------------------------------
-;-- Disable Capitalism fairy
-org $06C454 ; <- 34454 - sprite_ponds.asm:133 (LDA $0D80, X)
-LDA.b #$00 : NOP
+;-- Convert Capitalism fairy to shop
+org $06C4BD ; <- 34C4BD - sprite_ponds.asm:107 (LDA $A0 : CMP.b #$15 : BEQ Sprite_HappinessPond)
+JSL.l HappinessPond_Check
 ;--------------------------------------------------------------------------------
 ;-- Sahasrahla (no green pendant)
 org $05F16C ; <- 2F16C sprite_elder.asm:137 (JSL Sprite_ShowSolicitedMessageIfPlayerFacing)
@@ -1580,6 +1755,26 @@ db #$8F
 ;================================================================================
 ; Text Removal
 ;--------------------------------------------------------------------------------
+org $05FA8E
+Sprite_ShowMessageMinimal:
+JML.l Sprite_ShowMessageMinimal_Alt
+;--------------------------------------------------------------------------------
+;org $1CFD69
+;Main_ShowTextMessage:
+;JML.l Main_ShowTextMessage_Alt
+;--------------------------------------------------------------------------------
+org $07b0cc ; <- 3b0d0 - Bank 07.asm : 7767 (JSL Main_ShowTextMessage)
+JSL.l Main_ShowTextMessage_Alt
+;--------------------------------------------------------------------------------
+org $08c5fe ; <- 445FE - ancilla_receive_item.asm : 408 (JSL Main_ShowTextMessage)
+JSL.l Main_ShowTextMessage_Alt
+;--------------------------------------------------------------------------------
+org $05E21F ; <- 2E21F - Bank05.asm : 2691 (STZ $0223)
+JSL.l Sprite_ShowMessageMinimal_Alt
+BRA Sprite_ShowMessageUnconditional_Rest
+org $05E232 ; <- 2E232 - Bank05.asm : 2700 (PHX)
+Sprite_ShowMessageUnconditional_Rest:
+;--------------------------------------------------------------------------------
 ;-- Music restarting at zelda fix
 org $05ED10 ; <- 2ED10 - sprite_zelda.asm : 233 - (LDA.b #$19 : STA $012C)
 NOP #5
@@ -1620,9 +1815,6 @@ org $06B4F3 ; <- 334F3 sprite_smithy_bros.asm : 556 (JSL Sprite_ShowMessageUncon
 JSL ItemSet_SmithSword
 ;NOP #4
 ;----------------------------------------------------------
-org $05FBC2 ; <- 2FBC3 - sprite_mad_batter.asm:195 - (JSL Sprite_ShowMessageUnconditional)
-NOP #4 ; removing this breaks animated received objects like rupees
-;----------------------------------------------------------
 
 ;===================================
 ;-- Escort Text
@@ -1647,14 +1839,9 @@ dw $05AC, $04FC, $0001, $0027, $00F0 ; Zelda in the water room
 ; org $01CA66 ; <- CA66 Bank01.asm : 10864 - (LDA.w #$2200 : ADD $041C : STA $041C)
 ; LDA.w #$4400 ; #$2200 is the normal speed, $#FF00 is max.
 ;----------------------------------------------------------
-;-- Hobo gives item faster
-; org $06BE3A ; <- 33E3A sprite_hobo.asm : 90 - (db 6, 2, 6, 6, 2, 100, 30)
-; db 6, 2, 6, 6, 2, 6, 30
-;----------------------------------------------------------
-;-- Sick kid gives item faster
-; org $06B9A1 ; <- 339A1 sprite_bug_net_kid : 62 - (db 8, 12, 8, 12, 8, 96, 16)
-; db 8, 12, 8, 12, 8, 32, 16
-;----------------------------------------------------------
+;-- New Sign table offet calculation
+org $07b4fe ; <- 3b4fe - bank07.asm : 8454 (LDA $8A : ASL A : TAY)
+JSL CalculateSignIndex
 
 ;================================================================================
 ; Ganon Fixes
@@ -1910,11 +2097,36 @@ JSL.l OnEnterWater : NOP
 org $0AB8E5 ; <- 538E5
 JSL.l FloodGateAndMasterSwordFollowerReset
 JSL.l IncrementFlute
-NOP #32
+STZ $1000 : STZ $1001
+NOP #26
 ;--------------------------------------------------------------------------------
 org $02AA87 ; <- 12A87
 JSL.l OnOWTransition
 NOP #36
+
+;================================================================================
+;Inverted mode tile map update (executed right after the original tile load)
+;--------------------------------------------------------------------------------
+org $02ED51 ; <- 16D51
+JSL.l Overworld_LoadNewTiles
+NOP #$02
+;--------------------------------------------------------------------------------
+;Same as above
+org $02EC2E ;<- 016C2E
+JSL.l Overworld_LoadNewTiles
+NOP #$02
+;================================================================================
+org $07A3E2 ;<- 3A3E2 Bank07.asm:5764 (LDA.b #$80 : STA $03F0)
+JSL.l FreeDuckCheck : BEQ +
+	NOP
+	skip 3 ; a JSR we need to keep
++
+;================================================================================
+org $07A9AC ; <- 3A9AC - Bank07.asm:6628 (LDA $0C : ORA $0E : STA $00 : AND.b #$0C : BEQ BRANCH_BETA)
+JML.l MirrorBonk
+MirrorBonk_NormalReturn:
+org $07A9D1 ; <- 3A9D1 - Bank07.asm:6649 (BRANCH_GAMMA:)
+MirrorBonk_BranchGamma:
 ;================================================================================
 
 ;================================================================================
@@ -1987,6 +2199,31 @@ NOP #1
 ;================================================================================
 
 ;================================================================================
+; Hole fixes
+;--------------------------------------------------------------------------------
+org $1BB88E ; <- DB88E - Bank1B.asm:59 (LDX.w #$0024)
+JML.l CheckHole
+org $1BB8A4 ; <- DB8A4 - Bank1B.asm:78 (LDX.w #$0026)
+Overworld_Hole_GotoHoulihan:
+org $1BB8AF ; <- DB8AF - Bank1B.asm:85 (.matchedHole)
+Overworld_Hole_matchedHole:
+org $1BB8BD ; <- DB8BD - Bank1B.asm:85 (PLB)
+Overworld_Hole_End:
+
+;--------------------------------------------------------------------------------
+
+;================================================================================
+; Disable pyramid hole check for killing aga2
+;
+; this check is intended to prevent getting fluted out a second time if you 
+; return to his room after already killing him once. But with a pre-opened 
+; pyramid hole, it can cause you to get stuck there on killing him the first 
+; time. So we change it, and accept the flute out if you return. 
+;---------------------------------------------------------------------------------
+org $01C753 ; 0C753 = Bank01:10398 (LDA $7EF2DB : AND.b #$20 : BNE .return)
+db $00 ; (originally $20)
+
+;================================================================================
 ; Music fixes
 ;--------------------------------------------------------------------------------
 org $0282F4 ; <- Bank02.asm:654 (LDY.b #$58 ...)
@@ -1997,6 +2234,13 @@ PreOverworld_LoadProperties_SetSong:
 org $05CC58 ; <- Bank05.asm:1307 (LDA $040A : CMP.b #$18)
 JSL PsychoSolder_MusicCheck
 NOP #1
+;--------------------------------------------------------------------------------
+org $02B13A ; <- Bank02.asm:7647
+dl Overworld_FinishMirrorWarp
+;--------------------------------------------------------------------------------
+org $0AB949 ; <- Bank0A.asm:270 (Different from US ROM)
+JSL BirdTravel_LoadTargetAreaMusic
+NOP #16
 ;================================================================================
 
 ;================================================================================
@@ -2064,6 +2308,10 @@ org $0689AB ; <- 309AB - sprite_prep.asm: 647 (LDA $7EF3CC : CMP.b #$06 : BEQ .k
 ; Prevent followers from causing blind/maiden to despawn:
 CMP.b #$06 : db #$F0 ; BEQ
 ;--------------------------------------------------------------------------------
+; Fix old man purple chest issues using the same method as above
+org $1EE906 ; <- F6906 - sprite_old_mountain_man.asm : 31 (LDA $7EF3CC : CMP.b #$00 : BNE .already_have_tagalong)
+CMP.b #$04 : db #$F0 ; BEQ
+;--------------------------------------------------------------------------------
 ;Control which doors frog/smith can enter
 org $1BBCF0 ; <- DBCF0 - Bank1B.asm: 248 (LDA $04B8 : BNE BRANCH_MU)
 Overworld_Entrance_BRANCH_LAMBDA: ; Branch here to show Cannot Enter with Follower message
@@ -2091,6 +2339,16 @@ org $0DA9C8 ; <- 06A9C8 - player_oam.asm: 1663 (AND.w #$00FF : CMP.w #$00F8 : BC
 ; to the link sprite).
 LDA $02 ; always zero! (this replaces the BCC)
 ADC.w #0000 ; put the carry bit into the accumulator instead of a hardcoded 1.
+;-------------------------------------------------------------------------------
+org $02fd6f ; <- 017d6f - bank0E.asm: 3694 (LoadActualGearPalettes:) Note: Overflow of bank02 moved to 0e in US Rom
+JSL LoadActualGearPalettesWithGloves
+RTL
+;--------------------------------------------------------------------------------
+; Bunny Palette/Overworld Map Bugfix
+;--------------------------------------------------------------------------------
+org $02fdf0 ; <- 017df0 - bank0E (LDA [$00] : STA $7EC300, X : STA $7EC500, X)
+JSL LoadGearPalette_safe_for_bunny
+RTS
 ;================================================================================
 
 ;================================================================================
@@ -2106,4 +2364,89 @@ org $01EC14 ; <- 0EC14 - bank01.asm : 13783 (LDX $040C)
 Dungeon_OpenKeyedObject_bigChest:
 org $01EC38 ; <- 0EC38 - bank01.asm : 13809 (.smallChest)
 Dungeon_OpenKeyedObject_smallChest:
+;================================================================================
+
+;================================================================================
+; Murahdahla (The brother who re-assembles the triforce pieces)
+;--------------------------------------------------------------------------------
+org $06C092 ; bank06.asm:1864 (JSL Sprite_ElderLong) [22 CD F0 05]
+JSL NewElderCode
+;--------------------------------------------------------------------------------
+; Add him to Castle Map post-rain, and post aga1
+;--------------------------------------------------------------------------------
+org $09D0AC
+db #$18, #$0F, #$43, #$FF;remove heart from tree adjancent map [LW1]
+db #$12, #$19, #$16 ;add sahasrala in castle Y, X, Sprite ID
+org $09C937
+db #$B0, #$D0 ;change [LW1] map 01C pointers
+org $09D421
+db #$18, #$0F, #$45, #$FF;remove heart from tree adjancent map [LW2]
+db #$12, #$19, #$16 ;add sahasrala in castle Y, X, Sprite ID
+org $09CA57
+db #$25, #$D4 ;change [LW2] map 01C pointers
+;--------------------------------------------------------------------------------
+; Expanded trinexx sheet gfx.
+;--------------------------------------------------------------------------------
+org $00CFC0+178 : db #$33
+org $00D09F+178 : db #$90
+org $00D17E+178 : db #$00
+; Use above sheet in Hyrule castle courtyard after rain state.
+org $00DB9E ; Hyrule Castle GFX Sprite Sheet 4 on [LW1]
+db #$3F
+org $00DC0A ; Hyrule Castle GFX Sprite Sheet 4 on [LW2]
+db #$3F
+;--------------------------------------------------------------------------------
+; Updated evil barrier animation table
+;--------------------------------------------------------------------------------
+org $1DF0E1;Evil Barrier new draw code
+
+dw   0,  0 : db $CC, $00, $00, $02
+dw -29,  3 : db $EA, $00, $00, $00
+dw -29, 11 : db $FA, $00, $00, $00
+dw  37,  3 : db $EA, $40, $00, $00
+dw  37, 11 : db $FA, $40, $00, $00
+dw -24, -2 : db $CE, $00, $00, $02
+dw  -8, -2 : db $CE, $00, $00, $02
+dw   8, -2 : db $CE, $40, $00, $02
+dw  24, -2 : db $CE, $40, $00, $02
+
+dw   0,  0 : db $EC, $00, $00, $02
+dw -29,  3 : db $EB, $00, $00, $00
+dw -29, 11 : db $FB, $00, $00, $00
+dw  37,  3 : db $EB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw   0,  0 : db $EC, $00, $00, $02
+dw   0,  0 : db $EC, $00, $00, $02
+dw   0,  0 : db $EC, $00, $00, $02
+dw   0,  0 : db $EC, $00, $00, $02
+
+dw   0,  0 : db $EC, $00, $00, $02
+dw -29,  3 : db $EB, $00, $00, $00
+dw -29, 11 : db $FB, $00, $00, $00
+dw  37,  3 : db $EB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw -24, -2 : db $CE, $80, $00, $02
+dw  -8, -2 : db $CE, $80, $00, $02
+dw   8, -2 : db $CE, $C0, $00, $02
+dw  24, -2 : db $CE, $C0, $00, $02
+
+dw   0,  0 : db $CC, $00, $00, $02
+dw -29,  3 : db $EA, $00, $00, $00
+dw -29, 11 : db $FA, $00, $00, $00
+dw  37,  3 : db $EA, $40, $00, $00
+dw  37, 11 : db $FA, $40, $00, $00
+dw   0,  0 : db $CC, $00, $00, $02
+dw   0,  0 : db $CC, $00, $00, $02
+dw   0,  0 : db $CC, $00, $00, $02
+dw   0,  0 : db $CC, $00, $00, $02
+
+dw -29,  3 : db $EB, $00, $00, $00
+dw -29, 11 : db $FB, $00, $00, $00
+dw  37,  3 : db $EB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
+dw  37, 11 : db $FB, $40, $00, $00
 ;================================================================================

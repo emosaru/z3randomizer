@@ -45,6 +45,9 @@ RTL
 ;--------------------------------------------------------------------------------
 ;0 = Become (Perma)bunny
 DecideIfBunnyByScreenIndex:
+	; If indoors we don't have a screen index. Return non-bunny to make mirror-based
+	; superbunny work
+	LDA $1B : BEQ + : RTL : +
 	LDA $7EF357 : BEQ + : RTL : +
 	LDA $8A : AND.b #$40 : PHA
 	LDA.l InvertedMode : BNE .inverted
@@ -125,3 +128,59 @@ PodEGFix:
     .done
 RTL
 ;--------------------------------------------------------------------------------
+; Fix crystal not spawning when using somaria vs boss
+TryToSpawnCrystalUntilSuccess:
+	STX $02D8 ; what we overwrote
+	JSL AddAncillaLong : BCC .spawned ; a clear carry flag indicates success
+		.failed
+		RTL
+	.spawned
+	STZ $AE ; the "trying to spawn crystal" flag
+	STZ $AF ; the "trying to spawn pendant" flag
+RTL
+
+;--------------------------------------------------------------------------------
+; Fix crystal not spawning when using somaria vs boss
+WallmasterCameraFix:
+	STZ $A7    ; disable vertical camera scrolling for current room
+	REP #$20
+	STZ $0618  ; something about scrolling, setting these to 0 tricks the game 
+	STZ $061A  ; into thinking we're at the edge of the room so it doesn't scroll.
+	SEP #$20
+	JML Sound_SetSfx3PanLong ; what we wrote over, also this will RTL
+
+;--------------------------------------------------------------------------------
+; Fix losing glove colors
+LoadActualGearPalettesWithGloves:
+REP #$20
+LDA $7EF359 : STA $0C
+LDA $7EF35B : AND.w #$00FF
+JSL LoadGearPalettes_variable
+JSL SpriteSwap_Palette_ArmorAndGloves_part_two
+RTL
+
+;--------------------------------------------------------------------------------
+; Fix Bunny Palette Map Bug
+LoadGearPalette_safe_for_bunny:
+LDA $10 
+CMP.w #$030E : BEQ .new ; opening dungeon map
+CMP.w #$070E : BEQ .new ; opening overworld map
+.original
+-
+	lda [$00]
+	sta $7ec300, x
+	sta $7ec500, x
+	inc $00 : inc $00
+	inx #2
+	dey
+	bpl -
+RTL
+.new
+-
+	lda [$00]
+	sta $7ec500, x
+	inc $00 : inc $00
+	inx #2
+	dey
+	bpl -
+RTL

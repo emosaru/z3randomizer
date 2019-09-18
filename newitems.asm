@@ -27,8 +27,13 @@
 ; #$61 - Progressive Lifting Glove
 ; #$62 - RNG Pool Item (Single)
 ; #$63 - RNG Pool Item (Multi)
+; #$64 - Progressive Bow
+; #$65 - Progressive Bow
 ; #$6A - Goal Item (Single/Triforce)
 ; #$6B - Goal Item (Multi/Power Star)
+; #$6C - Goal Item (Multi/Triforce Piece)
+; #$6D- Server Request
+; #$6E - Server Request (Dungeon Drop)
 ; #$70 - Maps
 ; #$80 - Compasses
 ; #$90 - Big Keys
@@ -158,8 +163,11 @@ ProcessEventItems:
 
 			LDA GoalItemRequirement : BEQ ++
 			LDA !GOAL_COUNTER : INC : STA !GOAL_COUNTER
-			CMP GoalItemRequirement : !BLT ++ : JSL.l ActivateGoal : ++
-			
+			CMP GoalItemRequirement : !BLT ++ 
+			LDA TurnInGoalItems : BNE ++
+				JSL.l ActivateGoal 
+			++
+
 			LDX.b #$01 : BRA .done
 		+
 		LDX.b #$00
@@ -173,11 +181,11 @@ RTS
 ;--------------------------------------------------------------------------------
 AddReceivedItemExpandedGetItem:
 	PHX
-	
+
 	;JSR.w ProcessEventItems : CPX.b #$00 : BEQ ++
-	;	;JSL.l Main_ShowTextMessage
+	;	;JSL.l Main_ShowTextMessage_Alt
 	;	LDA !GOAL_COUNTER : INC : STA !GOAL_COUNTER
-	;	LDA.b #$01 : STA $7F50A0
+	;	LDA.b #$01 : STA $7F50XX
 	;	BRL .done
 	;++
 	;STA $FFFFFF
@@ -188,6 +196,15 @@ AddReceivedItemExpandedGetItem:
 		LDA.l SilverArrowsUseRestriction : BNE ++
 			LDA.b #03 : STA $7EF340 ; set bow to silver
 		++
+		BRL .done
+	+ CMP.b #$3B : BNE + ; Silver Bow
+		LDA $7EF376 : BNE ++ ; check arrows
+			LDA.b #$03 : BRA +++ ; bow without arrow
+		++
+			LDA.b #$04 ; bow with arrow
+		+++
+		STA $7EF340
+		LDA !INVENTORY_SWAP_2 : ORA #$40 : STA !INVENTORY_SWAP_2 ; mark silver bow on y-toggle
 		BRL .done
 	+ CMP.b #$4C : BNE + ; 50 bombs
 		;LDA.b #$07 : STA $7EF370 ; upgrade bombs
@@ -283,6 +300,10 @@ AddReceivedItemExpandedGetItem:
 		BRL .done
 	+ CMP.b #$63 : BNE + ; RNG Pool Item (Multi)
 		BRL .done
+	+ CMP.b #$64 : BNE + ; Progressive Bow
+		BRL .done
+	+ CMP.b #$65 : BNE + ; Progressive Bow
+		BRL .done
 	+ CMP.b #$6A : BNE + ; Goal Collectable (Single/Triforce)
 		JSL.l ActivateGoal
 		BRL .done
@@ -292,7 +313,16 @@ AddReceivedItemExpandedGetItem:
 		.multi_collect
 		LDA GoalItemRequirement : BEQ ++
 		LDA !GOAL_COUNTER : INC : STA !GOAL_COUNTER
-		CMP GoalItemRequirement : !BLT ++ : JSL.l ActivateGoal : ++
+		CMP GoalItemRequirement : !BLT ++
+		LDA TurnInGoalItems : BNE ++
+				JSL.l ActivateGoal
+		++
+		BRL .done
+	+ CMP.b #$6D : BNE + ; Server Request
+		JSL ItemGetServiceRequest
+		BRL .done
+	+ CMP.b #$6E : BNE + ; Server Request (Dungeon Drop)
+		JSL ItemGetServiceRequest
 		BRL .done
 	+ CMP.b #$70 : !BLT + : CMP.b #$80 : !BGE + ; Free Map
 		AND #$0F : CMP #$08 : !BGE ++
@@ -330,13 +360,13 @@ AddReceivedItemExpandedGetItem:
 	+ CMP.b #$A0 : !BLT + : CMP.b #$B0 : !BGE + ; Free Small Key
 		AND #$0F : TAX
 		LDA $7EF37C, X : INC : STA $7EF37C, X ; Increment Key Count
-		
+
 		CPX.b #$00 : BNE ++
 			STA $7EF37D ; copy HC to sewers
 		++ : CPX.b #$01 : BNE ++
 			STA $7EF37C ; copy sewers to HC
 		++
-		
+
 		LDA.l GenericKeys : BEQ +
 		.generic
 			LDA $7EF36F : INC : STA $7EF36F
@@ -374,13 +404,13 @@ AddReceivedItemExpanded:
 {
 	PHA : PHX
 		JSL.l PreItemGet
-		
+
 		LDA $02D8 ; Item Value
 		JSR AttemptItemSubstitution
 		STA $02D8
-		
+
 		JSR IncrementItemCounters
-			
+
 		CMP.b #$16 : BNE ++ ; Bottle
 			JSR.w CountBottles : CMP.l BottleLimit : !BLT +++
 				LDA.l BottleLimitReplacement : STA $02D8
@@ -433,15 +463,15 @@ AddReceivedItemExpanded:
 				LDA !PROGRESSIVE_SHIELD : !ADD.b #$40 : STA !PROGRESSIVE_SHIELD : BRL .done
 			+ : CMP.b #$40 : BNE + ; Fighter Shield
 				LDA.b #$05 : STA $02D8
-				LDA !PROGRESSIVE_SHIELD : !ADD.b #$40 : STA !PROGRESSIVE_SHIELD : BRA .done
+				LDA !PROGRESSIVE_SHIELD : !ADD.b #$40 : STA !PROGRESSIVE_SHIELD : BRL .done
 			+ ; Everything Else
 				LDA.b #$06 : STA $02D8
-				LDA !PROGRESSIVE_SHIELD : !ADD.b #$40 : STA !PROGRESSIVE_SHIELD : BRA .done
+				LDA !PROGRESSIVE_SHIELD : !ADD.b #$40 : STA !PROGRESSIVE_SHIELD : BRL .done
 		++ : CMP.b #$60 : BNE ++ ; Progressive Armor
 			LDA $7EF35B : CMP.l ProgressiveArmorLimit : !BLT +
 				LDA.l ProgressiveArmorReplacement : STA $02D8 : BRL .done
 			+ : CMP.b #$00 : BNE + ; No Armor
-				LDA.b #$22 : STA $02D8 : BRA .done
+				LDA.b #$22 : STA $02D8 : BRL .done
 			+ ; Everything Else
 				LDA.b #$23 : STA $02D8 : BRA .done
 		++ : CMP.b #$61 : BNE ++ ; Progressive Lifting Glove
@@ -449,6 +479,16 @@ AddReceivedItemExpanded:
 				LDA.b #$1B : STA $02D8 : BRA .done
 			+ ; Everything Else
 				LDA.b #$1C : STA $02D8 : BRA .done
+		++ : CMP.b #$64 : BNE ++ : -- ; Progressive Bow
+			LDA $7EF340 : INC : LSR : CMP.l ProgressiveBowLimit : !BLT +
+				LDA.l ProgressiveBowReplacement : STA $02D8 : BRL .done
+			+ : CMP.b #$00 : BNE + ; No Bow
+				LDA.b #$3A : STA $02D8 : BRA .done
+			+ ; Any Bow
+				LDA.b #$3B : STA $02D8 : BRA .done
+		++ : CMP.b #$65 : BNE ++ ; Progressive Bow 2
+			LDA #$20 : TSB !INVENTORY_SWAP_2
+			BRA --
 		++ : CMP.b #$62 : BNE ++ ; RNG Item (Single)
 			JSL.l GetRNGItemSingle : STA $02D8
 			XBA : JSR.w MarkRNGItemSingle
@@ -495,7 +535,8 @@ AddReceivedItemExpanded:
 	db -4, -4, -4 ; Red, Blue & Green Clocks
 	db -4, -4, -4, -4 ; Progressive Sword, Shield, Armor & Gloves
 	db -4, -4 ; RNG Single & Multi
-	db -4, -4, -4, -4, -4, -4 ; Unused
+	db -4, -4 ; Progressive Bow x2
+	db -4, -4, -4, -4 ; Unused
 	db -4, -4, -4 ; Goal Item Single, Multi & Alt Multi
 	db -4, -4, -4 ; Unused
 	db -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4 ; Free Map
@@ -533,7 +574,8 @@ AddReceivedItemExpanded:
 	db  0, 0, 0 ; Red, Blue & Green Clocks
 	db  0, 0, 0, 0 ; Progressive Sword, Shield, Armor & Gloves
 	db  0, 0 ; RNG Single & Multi
-	db  0, 0, 0, 0, 0, 0 ; Unused
+	db  0, 0 ; Progressive Bow x2
+	db  0, 0, 0, 0 ; Unused
 	db  0, 0, 0 ; Goal Item Single, Multi & Alt Multi
 	db  0, 0, 0 ; Unused
 	db  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ; Free Map
@@ -563,6 +605,7 @@ AddReceivedItemExpanded:
     db $2C, $06, $0C, $38
 	;new
 	db $39, $3A, $3B, $3C
+	;5x
 	db $18 ; Master Sword (Safe)
 	db $3D, $3E, $3F, $40 ; +5/+10 Bomb Arrows
 	db $00, $00, $00 ; 3x Programmable Item
@@ -572,7 +615,8 @@ AddReceivedItemExpanded:
 	db $48, $48, $48 ; Red, Blue & Green Clocks
 	db $FF, $FF, $04, $0D ; Progressive Sword, Shield, Armor & Gloves
 	db $FF, $FF ; RNG Single & Multi
-	db $FF, $FF, $FF, $FF, $FF, $FF ; Unused
+	db $FF, $FF ; Progressive Bow x2
+	db $FF, $FF, $FF, $FF ; Unused
 	db $49, $4A, $49 ; Goal Item Single, Multi & Alt Multi
 	db $FF, $FF, $FF ; Unused
 	db $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21 ; Free Map
@@ -615,7 +659,8 @@ AddReceivedItemExpanded:
 	db $02, $02, $02 ; Red, Blue & Green Clocks
 	db $02, $02, $02, $02 ; Progressive Sword, Shield, Armor & Gloves
 	db $02, $02 ; RNG Single & Multi
-	db $02, $02, $02, $02, $02, $02 ; Unused
+	db $02, $02 ; Progressive Bow x2
+	db $02, $02, $02, $02 ; Unused
 	db $02, $02, $02 ; Goal Item Single, Multi & Alt Multi
 	db $02, $02, $02 ; Unused
 	db $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02, $02 ; Free Map
@@ -655,7 +700,8 @@ AddReceivedItemExpanded:
 	db  1, 2, 4 ; Red, Blue & Green Clocks
 	db  $FF, $FF, $FF, $FF ; Progressive Sword, Shield, Armor & Gloves
 	db  $FF, $FF ; RNG Single & Multi
-	db  0, 0, 0, 0, 0, 0 ; Unused
+	db  0, 0 ; Progressive Bow
+	db  0, 0, 0, 0 ; Unused
 	db  4, 4, 4 ; Goal Item Single, Multi & Alt Multi
 	db  0, 0, 0 ; Unused
 	db  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 ; Free Map
@@ -695,7 +741,8 @@ AddReceivedItemExpanded:
 	dw $F454, $F454, $F454 ; Red, Blue & Green Clocks
 	dw $F359, $F35A, $F35B, $F354 ; Progressive Sword, Shield, Armor & Gloves
 	dw $F36A, $F36A ; RNG Single & Multi
-	dw $F36A, $F36A, $F36A, $F36A, $F36A, $F36A ; Unused
+	dw $F340, $F340 ; Progressive Bow x2
+	dw $F36A, $F36A, $F36A, $F36A ; Unused
 	dw $F36A, $F36A, $F36A ; Goal Item Single, Multi & Alt Multi
 	dw $F36A, $F36A, $F36A ; Unused
 	dw $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A, $F36A ; Free Map
@@ -737,7 +784,8 @@ AddReceivedItemExpanded:
 	db $FF, $FF, $FF ; Red, Blue & Green Clocks
 	db $FF, $FF, $FF, $FF ; Progressive Sword, Shield, Armor & Gloves
 	db $FF, $FF ; RNG Single & Multi
-	db $FF, $FF, $FF, $FF, $FF, $FF ; Unused
+	db $FF, $FF ; Progressive Bow
+	db $FF, $FF, $FF, $FF ; Unused
 	db $FF, $FF, $FF ; Goal Item Single, Multi & Alt Multi
 	db $FF, $FF, $FF ; Unused
 	db $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF ; Free Map
@@ -821,7 +869,8 @@ Link_ReceiveItemAlternatesExpanded:
 	db -1, -1, -1 ; Red, Blue & Green Clocks
 	db -1, -1, -1, -1 ; Progressive Sword, Shield, Armor & Gloves
 	db -1, -1 ; RNG Single & Multi
-	db -1, -1, -1, -1, -1, -1 ; Unused
+	db -1, -1 ; Progressive Bow
+	db -1, -1, -1, -1 ; Unused
 	db -1, -1 ; Goal Item Single, Multi & Alt Multi
 	db -1, -1, -1, -1 ; Unused
 	db -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 ; Free Map
@@ -874,7 +923,7 @@ RTL
 DrawHUDArrows:
 LDA.l ArrowMode : BEQ .normal
 	.rupee_arrows
-	
+
 	LDA $7EF377 : BEQ .none ; assuming silvers will increment this. if we go with something else, reorder these checks
 	LDA $7EF340 : BNE +
 	LDA !INVENTORY_SWAP_2 : AND.b #$40 : BNE .silver
@@ -1022,7 +1071,7 @@ AttemptItemSubstitution:
 				CMP.l ItemSubstitutionRules+1, X : !BLT +
 					LDA.l ItemSubstitutionRules+2, X : STA 1,s
 				+
-				
+
 				BEQ .exit
 			.noMatch
 				INX #4

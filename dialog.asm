@@ -140,29 +140,32 @@ FreeDungeonItemNotice:
 	LDA.l FreeItemText : BNE + : BRL .skip : +
 
 	LDA #$00 : STA $7F5010 ; initialize scratch
-	LDA !ITEM_TEMPORARY
-	CMP.b #$24 : BNE + ; general small key
+	LDA.l FreeItemText : AND.b #$01 : CMP.b #$01 : BNE + ; show message for general small key
+	LDA !ITEM_TEMPORARY : CMP.b #$24 : BNE + ; general small key
 		%CopyDialog(Notice_SmallKeyOf)
 		LDA !OFFSET_RETURN : DEC #2 : STA !OFFSET_POINTER
 		%CopyDialog(Notice_Self)
 		BRL .done
-	+ : CMP.b #$25 : BNE + ; general compass
+	+ : LDA.l FreeItemText : AND.b #$02 : CMP.b #$02 : BNE + ; show message for general compass
+	LDA !ITEM_TEMPORARY : CMP.b #$25 : BNE + ; general compass
 		%CopyDialog(Notice_CompassOf)
 		LDA !OFFSET_RETURN : DEC #2 : STA !OFFSET_POINTER
 		%CopyDialog(Notice_Self)
 		BRL .done
-	+ : CMP.b #$33 : BNE + ; general map
+	+ : LDA.l FreeItemText : AND.b #$04 : CMP.b #$04 : BNE + ; show message for general map
+	LDA !ITEM_TEMPORARY : CMP.b #$33 : BNE + ; general map
 		%CopyDialog(Notice_MapOf)
 		LDA !OFFSET_RETURN : DEC #2 : STA !OFFSET_POINTER
 		%CopyDialog(Notice_Self)
 		BRL .done
-	+ : CMP.b #$32 : BNE + ; general big key
+	+ : LDA.l FreeItemText : AND.b #$08 : CMP.b #$08 : BNE + ; show message for general big key
+	LDA !ITEM_TEMPORARY : CMP.b #$32 : BNE + ; general big key
 		%CopyDialog(Notice_BigKeyOf)
 		LDA !OFFSET_RETURN : DEC #2 : STA !OFFSET_POINTER
 		%CopyDialog(Notice_Self)
 		BRL .done
 	+
-	AND.b #$F0 ; looking at high bits only
+	LDA !ITEM_TEMPORARY : AND.b #$F0 ; looking at high bits only
 	CMP.b #$70 : BNE + ; map of...
 		%CopyDialog(Notice_MapOf)
 		BRL .dungeon
@@ -228,7 +231,7 @@ FreeDungeonItemNotice:
 
 	STZ $1CF0 : STZ $1CF1 ; reset decompression buffer
 	LDA.b #$01 : STA $7F5035 ; set alternate dialog flag
-	LDA.b #$01 : STA $7F50A0
+	LDA.b #$01 : STA $7F509F
 
 	;--------------------------------
 		PLA : STA $02
@@ -237,7 +240,7 @@ FreeDungeonItemNotice:
 	PLB
 	PLP
 	PLY : PLX : PLA
-	;JSL.l Main_ShowTextMessage
+	;JSL.l Main_ShowTextMessage_Alt
 RTL
 
 	.skip
@@ -288,17 +291,41 @@ DialogGanon1:
 	+
 		REP #$20 : LDA.w #$016D : STA $1CF0 : SEP #$20
 	++
-	JSL.l Sprite_ShowMessageMinimal
+	JSL.l Sprite_ShowMessageMinimal_Alt
 RTL
 ;--------------------------------------------------------------------------------
+; #$0192 - no bow
+; #$0193 - no silvers alternate
+; #$0194 - no silvers
+; #$0195 - silvers
+; $7EF38E - bsp-- ---
+; b = bow
+; s = silver arrow bow
+; p = 2nd progressive bow
 DialogGanon2:
-	JSL.l CheckGanonVulnerability : BCS +
-		REP #$20 : LDA.w #$018D : STA $1CF0 : SEP #$20
-		BRA ++
-	+
-		REP #$20 : LDA.w #$016E : STA $1CF0 : SEP #$20
-	++
-	JSL.l Sprite_ShowMessageMinimal
+    JSL.l CheckGanonVulnerability : BCS +
+        REP #$20 : LDA.w #$018D : STA $1CF0 : SEP #$20
+        BRA ++
+    +
+        LDA.l $7EF38E : AND #$80 : BNE + ; branch if bow
+        REP #$20 : LDA.w #$0192 : STA $1CF0 : SEP #$20 ; no bow
+        BRA ++
+    +
+        LDA.l $7EF38E : AND #$40 : BEQ + ; branch if no silvers
+        REP #$20 : LDA.w #$0195 : STA $1CF0 : SEP #$20 ;has silvers
+        BRA ++
+    +
+        LDA.l $7EF38E : AND #$20 : BNE + ; branch if p bow
+        REP #$20 : LDA.w #$0194 : STA $1CF0 : SEP #$20  ; bow, no-silvers, no-p-bow
+        BRA ++
+    +
+        LDA.l $7EF38E : AND #$80 : BEQ + ; branch if no bow
+        REP #$20 : LDA.w #$0193 : STA $1CF0 : SEP #$20 ; bow, no-silvers, p-bow
+        BRA ++
+    +
+        REP #$20 : LDA.w #$016E : STA $1CF0 : SEP #$20 ; both bow and no bow. impossible.
+    ++
+    JSL.l Sprite_ShowMessageMinimal_Alt
 RTL
 ;--------------------------------------------------------------------------------
 DialogEtherTablet:
@@ -366,6 +393,79 @@ DialogBombShopGuy:
     LDY.b #$01
 	JSL.l Sprite_ShowMessageUnconditional
 RTL
+;--------------------------------------------------------------------------------
+Main_ShowTextMessage_Alt:
+	; Are we in text mode? If so then end the routine.
+	LDA $10 : CMP.b #$0E : BEQ .already_in_text_mode
+Sprite_ShowMessageMinimal_Alt:
+	STZ $11
+
+	PHX : PHY
+	LDA.b $00 : PHA
+	LDA.b $01 : PHA
+	LDA.b $02 : PHA
+
+	LDA.b #$1C : STA.b $02
+	REP #$30
+		LDA.w $1CF0 : ASL : TAX
+		LDA.l $7f71c0, X
+		STA.b $00
+	SEP #$30
+
+	LDY.b #$00
+	      LDA [$00], Y : CMP.b #$fe : BNE +
+	INY : LDA [$00], Y : CMP.b #$6e : BNE +
+	INY : LDA [$00], Y :            : BNE +
+	INY : LDA [$00], Y : CMP.b #$fe : BNE +
+	INY : LDA [$00], Y : CMP.b #$6b : BNE +
+	INY : LDA [$00], Y : CMP.b #$04 : BNE +
+		STZ $1CE8
+		BRL .end
+	+
+
+	STZ $0223   ; Otherwise set it so we are in text mode.
+	STZ $1CD8   ; Initialize the step in the submodule
+
+	; Go to text display mode (as opposed to maps, etc)
+	LDA.b #$02 : STA $11
+
+	; Store the current module in the temporary location.
+	LDA $10 : STA $010C
+
+	; Switch the main module ($10) to text mode.
+	LDA.b #$0E : STA $10
+	.end
+	PLA : STA.b $02
+	PLA : STA.b $01
+	PLA : STA.b $00
+	PLY : PLX
+
+Main_ShowTextMessage_Alt_already_in_text_mode:
+RTL
+
+CalculateSignIndex:
+  ; for the big 1024x1024 screens we are calculating link's effective
+  ; screen area, as though the screen was 4 different 512x512 screens.
+  ; And we do this in a way that will likely give the right value even 
+  ; with major glitches.
+
+  LDA $8A : ASL A : TAY ;what we wrote over
+
+  LDA $0712 : BEQ .done ; If a small map, we can skip these calculations.
+
+  LDA $21 : AND.w #$0002 : ASL #2 : EOR $8A : AND.w #$0008 : BEQ +
+  	TYA : !ADD.w #$0010 : TAY  ;add 16 if we are in lower half of big screen.
+  + 
+
+  LDA $23 : AND.w #$0002 : LSR : EOR $8A : AND.w #$0001 : BEQ +
+  TYA : INC #2 : TAY  ;add 16 if we are in lower half of big screen.
+  +
+  ; ensure even if things go horribly wrong, we don't read the sign out of bounds and crash:
+  TYA : AND.w #$00FF : TAY 
+
+.done
+RTL
+
 ;--------------------------------------------------------------------------------
 ; A0 - A9 - 0 - 9
 ; AA - C3 - A - Z

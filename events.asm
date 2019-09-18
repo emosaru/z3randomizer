@@ -10,18 +10,15 @@ OnPrepFileSelect:
 		LDA.b #$06 : STA $14 ; thing we wrote over
 		RTL
 	+
-	JSL.l LoadAlphabetTiles
 	JSL.l LoadAlphabetTilemap
 	JSL.l LoadFullItemTiles
 RTL
 ;--------------------------------------------------------------------------------
 OnDrawHud:
-	JSL.l Draw4DigitRupees
-	JSL.l DrawChallengeTimer
-	JSL.l DrawGoalIndicator
-	JSL.l DrawDungeonCompassCounts
+	JSL.l DrawChallengeTimer ; this has to come before NewDrawHud because the timer overwrites the compass counter
+	JSL.l NewDrawHud
 	JSL.l SwapSpriteIfNecissary
-RTL
+JML.l ReturnFromOnDrawHud
 ;--------------------------------------------------------------------------------
 ;OnDungeonEntrance:
 ;	STA $7EC172 ; thing we wrote over
@@ -42,7 +39,7 @@ OnDungeonExit:
 	PLP : PLA
 
 	STA $040C : STZ $04AC ; thing we wrote over
-	
+
 	PHA : PHP
 		JSL.l HUD_RebuildLong
 		JSL.l FloodGateResetInner
@@ -58,7 +55,7 @@ RTL
 ;--------------------------------------------------------------------------------
 OnUncleItemGet:
 	JSL Link_ReceiveItem
-	
+
 	LDA.l EscapeAssist
 	BIT.b #$04 : BEQ + : STA !INFINITE_MAGIC : +
 	BIT.b #$02 : BEQ + : STA !INFINITE_BOMBS : +
@@ -67,14 +64,14 @@ OnUncleItemGet:
 	LDA.l UncleRefill : BIT.b #$04 : BEQ + : LDA.b #$80 : STA $7EF373 : + ; refill magic
 	LDA.l UncleRefill : BIT.b #$02 : BEQ + : LDA.b #50 : STA $7EF375 : + ; refill bombs
 	LDA.l UncleRefill : BIT.b #$01 : BEQ + ; refill arrows
-		LDA.b #70 : STA $7EF376 
-		
+		LDA.b #70 : STA $7EF376
+
 		LDA.l ArrowMode : BEQ +
 			LDA !INVENTORY_SWAP_2 : ORA #$80 : STA !INVENTORY_SWAP_2 ; enable bow toggle
 			REP #$20 ; set 16-bit accumulator
 			LDA $7EF360 : !ADD.l FreeUncleItemAmount : STA $7EF360 ; rupee arrows, so also give the player some money to start
 			SEP #$20 ; set 8-bit accumulator
-	+ 
+	+
 RTL
 ;--------------------------------------------------------------------------------
 OnAga2Defeated:
@@ -93,7 +90,10 @@ OnFileLoad:
 		JSL.l OnNewFile
 		LDA.b #$FF : STA !FRESH_FILE_MARKER
 	+
-	JSL.l DoWorldFix
+	LDA.w $010A : BNE + ; don't adjust the worlds for "continue" or "save-continue"
+	LDA.l $7EC011 : BNE + ; don't adjust worlds if mosiac is enabled (Read: mirroring in dungeon)
+		JSL.l DoWorldFix
+	+
 	JSL.l MasterSwordFollowerClear
 	JSL.l InitOpenMode
 	LDA #$FF : STA !RNG_ITEM_LOCK_IN ; reset rng item lock-in
@@ -120,10 +120,10 @@ OnNewFile:
 		LDA.l StartingTime : STA $7EF454
 		LDA.l StartingTime+2 : STA $7EF454+2
 
-		LDX.w #$00 : - ; copy over starting equipment
+		LDX.w #$004E : - ; copy over starting equipment
 			LDA StartingEquipment, X : STA $7EF340, X
-			INX : INX
-		CPX.w #$004F : !BLT -
+			DEX : DEX
+		BPL -
 
 		SEP #$20 ; set 8-bit accumulator
 		;LDA #$FF : STA !RNG_ITEM_LOCK_IN ; reset rng item lock-in
@@ -131,6 +131,15 @@ OnNewFile:
 			LDA.b #$80 : STA $7EF061 ; open aga tower curtain
 			LDA.b #$80 : STA $7EF093 ; open skull woods curtain
 		+
+
+		LDA.l PreopenPyramid : BEQ +
+			LDA.b #$20 : STA $7EF2DB ; pyramid hole already open
+		+
+
+		LDA.l PreopenGanonsTower : BEQ +
+			LDA.b #$20 : STA $7EF2C3 ; Ganons Tower already open
+		+
+
 		LDA StartingSword : STA $7EF359 ; set starting sword type
 	PLP : PLX
 RTL
@@ -180,7 +189,7 @@ OnLoadDuckMap:
 	BNE +
 		INC : STA !DARK_DUCK_TEMP
 		JSL OverworldMap_InitGfx : DEC $0200
-		
+
 		RTL
 	+
 	LDA.b #$00 : STA !DARK_DUCK_TEMP
@@ -198,10 +207,17 @@ RTL
 PostItemAnimation:
 	LDA.b #$00 : STA !ITEM_BUSY ; mark item as finished
 
-	LDA $7F50A0 : BEQ +
+	LDA $02D8 : CMP #$32 : BNE +	; Big Key
+	LDA $1B : BEQ +					; Check that we're indoors
+	LDA $040C : CMP #$1A : BNE +	; Check that we're in Ganon's Tower
+		LDA !REG_MSU_FALLBACK_TABLE+7 : AND #$04 : BEQ +
+		LDA.b #59 : STA !REG_MUSIC_CONTROL_REQUEST
+	+
+
+	LDA $7F509F : BEQ +
 		STZ $1CF0 : STZ $1CF1 ; reset decompression buffer
-		JSL.l Main_ShowTextMessage
-		LDA.b #$00 : STA $7F50A0
+		JSL.l Main_ShowTextMessage_Alt
+		LDA.b #$00 : STA $7F509F
 	+
 
     STZ $02E9 : LDA $0C5E, X ; thing we wrote over to get here

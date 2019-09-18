@@ -15,12 +15,20 @@ GetAgahnimDeath:
 	LDA $A0 ; get room id
 	CMP.b #13 : BNE + ; Agahnim 2 room
 		LDA.l Bugfix_SetWorldOnAgahnimDeath : BEQ ++
+			LDA.l InvertedMode : BEQ +++
+				LDA.b #$00 : STA !DARK_WORLD ; Switch to light world
+				BRA ++
+			+++
 			LDA.b #$40 : STA !DARK_WORLD ; Switch to dark world
 		++
 		LDA.b #$01 ; Use Agahnim 2
 		RTL
 	+ ; Elsewhere
 		LDA.l Bugfix_SetWorldOnAgahnimDeath : BEQ ++
+			LDA.l InvertedMode : BEQ +++
+				LDA.b #$40 : STA !DARK_WORLD ; Switch to dark world
+				BRA ++
+			+++
 			LDA.b #$00 : STA !DARK_WORLD ; Switch to light world
 			; (This will later get flipped to DW when Agahnim 1
 			; warps us to the pyramid)
@@ -69,15 +77,3 @@ RTL
 	LDA $0112 : ORA $02E4 : ORA $0FFC
 RTL
 ;--------------------------------------------------------------------------------
-; add sign to EDM for OWG people to read
-;--------------------------------------------------------------------------------
-AddSignToEDMBridge:
-	LDA $040A : AND #$00FF : CMP #$0005 : BNE .no_changes
-		LDA #$0101 : STA $7E2D98 ;#$0101 is the sign tile16 id, $7E2D98 is the position of the tile16 on map
-	.no_changes
-
-	LDX.w #$001E ;Restore Previous Code
-	LDA.w #$0DBE ;Restore Previous Code
-RTL
-;--------------------------------------------------------------------------------
-

@@ -59,3 +59,47 @@ FluteBoy:
 	LDA $0D80, X : CMP.b #$03 ; thing we wrote over
 JML.l FluteBoy_Continue
 ;--------------------------------------------------------------------------------
+FreeDuckCheck:
+	LDA.l InvertedMode : BEQ .done
+	LDA $7EF34C : CMP.b #$03 : BEQ .done ; flute is already active
+	
+    ; check the area, is it #$18 = 30?
+    LDA $8A : CMP.b #$18 : BNE .done
+
+	REP #$20
+	
+    ; Y coordinate boundaries for setting it off.
+    LDA $20
+    
+    CMP.w #$0760 : BCC .done
+    CMP.w #$07E0 : BCS .done
+    
+    ; do if( (Ycoord >= 0x0760) && (Ycoord < 0x07e0
+    LDA $22
+    
+    CMP.w #$01CF : BCC .done
+    CMP.w #$0230 : BCS .done
+    
+    ; do if( (Xcoord >= 0x1cf) && (Xcoord < 0x0230)
+    SEP #$20
+    
+    ; Apparently a special Overworld mode for doing this?
+    LDA.b #$2D : STA $11
+    
+    ; Trigger the sequence to start the weathervane explosion.
+    LDY.b #$00
+    LDA.b #$37
+    
+    JSL AddWeathervaneExplosion
+	BRA .skipSong
+	.done
+    SEP #$20
+	LDA.b #$80 : STA $03F0 ; thing we wrote over, load flute timer
+	LDA.b #$13
+RTL
+	.skipSong
+	SEP #$20
+	LDA.b #$80 : STA $03F0 ; thing we wrote over, load flute timer
+	LDA.b #$00
+RTL
+;--------------------------------------------------------------------------------

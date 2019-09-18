@@ -3,22 +3,22 @@
 ;================================================================================
 !INVENTORY_SWAP = "$7EF38C"
 ; Item Tracking Slot
-; brmp-skf
+; brmpnskf
 ; b = blue boomerang
 ; r = red boomerang
-; m = mushroom
+; m = mushroom current
 ; p = magic powder
-; -
+; n = mushroom past
 ; s = shovel
 ; k = fake flute
 ; f = working flute
 ;--------------------------------------------------------------------------------
 !INVENTORY_SWAP_2 = "$7EF38E"
 ; Item Tracking Slot #2
-; bs------
+; bsp-----
 ; b = bow
 ; s = silver arrow bow
-; -
+; p = 2nd progressive bow
 ; -
 ; -
 ; -
@@ -208,7 +208,7 @@ AddInventory:
 		LDA !INVENTORY_SWAP : ORA #$40 : STA !INVENTORY_SWAP
 		BRL .incrementCounts
 	+ CPY.b #$29 : BNE + ; Mushroom
-		LDA !INVENTORY_SWAP : ORA #$20 : STA !INVENTORY_SWAP
+		LDA !INVENTORY_SWAP : ORA #$28 : STA !INVENTORY_SWAP
 		BRL .incrementCounts
 	+ CPY.b #$0D : BNE + ; Magic Powder
 		LDA !INVENTORY_SWAP : ORA #$10 : STA !INVENTORY_SWAP
@@ -232,6 +232,9 @@ AddInventory:
 		BRL .incrementCounts
 	+ CPY.b #$3B : BNE + ; Bow & Silver Arrows
 		LDA !INVENTORY_SWAP_2 : ORA #$40 : STA !INVENTORY_SWAP_2
+		LDA ArrowMode : BNE +++
+			LDA !INVENTORY_SWAP_2 : ORA #$80 : STA !INVENTORY_SWAP_2 ; activate wood arrows when not in rupee bow
+		+++
 		BRL .incrementCounts
 	+ CPY.b #$43 : BNE + ; Single arrow
 		LDA ArrowMode : BEQ +++
@@ -279,6 +282,7 @@ AddInventory:
 			CMP.w #287 : BNE + : BRL .shop : + ; kakariko shop
 			CMP.w #255 : BNE + : BRL .shop : + ; light world death mountain shop
 			CMP.w #276 : BNE + : BRL .shop : + ; waterfall fairy
+			CMP.w #277 : BNE + : BRL .shop : + ; upgrade fairy (shop)
 			CMP.w #278 : BNE + : BRL .shop : + ; pyramid fairy
 		PLP : BRA ++
 		.shop
@@ -526,6 +530,10 @@ AddInventory:
 		BRL .done
 	+ CPY.b #$61 : BNE + ; Progressive Lifting Glove
 		JSR .incrementA
+		BRL .done
+	+ CPY.b #$64 : !BLT + ; Items $64 & $65 - Progressive Bow
+	  CPY.b #$66 : !BGE +
+		JSR .incrementBow
 		BRL .done
 	+ CPY.b #$70 : !BLT + ; Items $70 - $7F - Free Maps
 	  CPY.b #$80 : !BGE +
@@ -872,6 +880,8 @@ RTL
 ;--------------------------------------------------------------------------------
 ClearOWKeys:
 	PHA
+
+	JSL.l TurtleRockEntranceFix
 	JSL.l FakeWorldFix
 	JSR.w FixBunnyOnExitToLightWorld
 	LDA.l GenericKeys : BEQ +
@@ -985,7 +995,7 @@ LoadMushroom:
 
 	LDA #$00 : STA !REDRAW
 	%GetPossiblyEncryptedItem(MushroomItem, SpriteItemValues)
-	STA $0DA0, X ; Store item type
+	STA $0E80, X ; Store item type
 	JSL.l PrepDynamicTile
 
 	.skip
@@ -1005,7 +1015,7 @@ DrawMushroom:
 		BRA .done ; don't draw on the init frame
 
 		.skipInit
-		LDA $0DA0, X ; Retrieve stored item type
+		LDA $0E80, X ; Retrieve stored item type
 		JSL.l DrawDynamicTile
 
 		.done

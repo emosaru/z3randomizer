@@ -34,16 +34,24 @@ DecrementArrows:
 	.infinite
 		LDA.b #$01 : RTL
 	.normal
-    	LDA $7EF377 : BEQ .done
-    	DEC : STA $7EF377 : INC
+		LDA $7EF377 : BEQ .done
+		DEC : STA $7EF377 : INC
 		BRA .done
 	.rupees
-		LDA $7EF340 : AND.b #$01 : BEQ +
-			LDA.b #$00 : RTL
-		+
+		REP #$20
+		LDA.b $A0 : CMP #$0111 : SEP #$20 : BNE .not_archery_game
+			LDA.b $1B : BEQ .not_archery_game ; in overworld
+			LDA.w $0B9A : BEQ .shoot_arrow ; arrow game active
+			LDA.b #$00 : BRA .done
+		
+		.not_archery_game
+		LDA.l $7EF377 : BNE .shoot_arrow ; check if we have arrows
+			BRA .done
+		
+		.shoot_arrow
 		PHX
-		REP #$20 ; set 16-bit accumulator
-    	LDA $7EF360 : BEQ +
+		REP #$20
+		LDA $7EF360 : BEQ +
 			PHA : LDA $7EF340 : DEC : AND #$0002 : TAX : PLA
 			!SUB.l ArrowModeWoodArrowCost, X ; CMP.w #$0000
 			BMI .not_enough_money
@@ -58,16 +66,17 @@ DecrementArrows:
 RTL
 
 ArrowGame:
-    LDA $0B99 : BEQ +
-    	DEC $0B99 ; reduce minigame arrow count
+	LDA $0B99 : BEQ +
+		DEC $0B99 ; reduce minigame arrow count
 		LDA.l ArrowMode : BNE .rupees
 		.normal
-    		LDA $7EF377 : INC #2 : STA $7EF377 ; increment arrow count (by 2 for some reason)
+			LDA $7EF377 : INC #2 : STA $7EF377 ; increment arrow count (by 2 for some reason)
+			RTL
 		.rupees
 			PHX
 			REP #$20 ; set 16-bit accumulator
-				PHA : LDA $7EF340 : DEC : AND #$0002 : TAX : PLA
-		    	LDA $7EF360 : !ADD.l ArrowModeWoodArrowCost, X : STA $7EF360
+				LDA $7EF340 : DEC : AND #$0002 : TAX
+				LDA $7EF360 : !ADD.l ArrowModeWoodArrowCost, X : STA $7EF360
 			SEP #$20 ; set 8-bit accumulator
 			PLX
 	+

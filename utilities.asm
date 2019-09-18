@@ -29,7 +29,7 @@ GetSpriteID:
 	;--------
 	TAX : LDA .gfxSlots, X ; look up item gfx
 	PLB : PLX
-	CMP.b #$F9 : !BGE .specialHandling
+	CMP.b #$F8 : !BGE .specialHandling
 RTL
 	.specialHandling
 	CMP.b #$F9 : BNE ++ ; Progressive Magic
@@ -75,6 +75,12 @@ RTL
 			LDA.b #$20 : RTL
 		+ ; Everything Else
 			LDA.b #$2E : RTL
+	++ : CMP.b #$F8 : BNE ++ ; Progressive Bow
+		LDA $7EF340
+		CMP.b #$00 : BNE + ; No Bow
+			LDA.b #$29 : RTL
+		+ ; Any Bow
+			LDA.b #$2A : RTL
 	++
 RTL
 
@@ -83,20 +89,20 @@ RTL
 	.gfxSlots
     db $06, $44, $45, $46, $2D, $20, $2E, $09
     db $09, $0A, $08, $05, $10, $0B, $2C, $1B
-    
+
     db $1A, $1C, $14, $19, $0C, $07, $1D, $2F
     db $07, $15, $12, $0D, $0D, $0E, $11, $17
-    
+
     db $28, $27, $04, $04, $0F, $16, $03, $13
     db $01, $1E, $10, $00, $00, $00, $00, $00
 
     db $00, $30, $22, $21, $24, $24, $24, $23
     db $23, $23, $29, $2A, $2C, $2B, $03, $03
-    
+
     db $34, $35, $31, $33, $02, $32, $36, $37
 	db $2C, $43, $0C, $38, $39, $3A, $F9, $3C
 	; db $2C, $06, $0C, $38, $FF, $FF, $FF, $FF
-	
+
 	;5x
 	db $44 ; Safe Master Sword
 	db $3D, $3E, $3F, $40 ; Bomb & Arrow +5/+10
@@ -106,26 +112,27 @@ RTL
 	db $47 ; Null Item
 	db $48, $48, $48 ; Red, Blue & Green Clocks
 	db $FE, $FF ; Progressive Sword & Shield
-	
+
 	;6x
 	db $FD, $0D ; Progressive Armor & Gloves
 	db $FA, $FB ; RNG Single & Multi
-	db $FF, $FF, $FF, $FF, $FF, $FF ; Unused
+	db $F8, $F8 ; Progressive Bow x2
+	db $FF, $FF, $FF, $FF ; Unused
 	db $49, $4A, $49 ; Goal Item Single, Multi & Alt Multi
 	db $FF, $FF, $FF ; Unused
-	
+
 	;7x
 	db $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21, $21 ; Free Map
-	
+
 	;8x
 	db $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16 ; Free Compass
-	
+
 	;9x
 	db $22, $22, $22, $22, $22, $22, $22, $22, $22, $22, $22, $22, $22, $22, $22, $22 ; Free Big Key
-	
+
 	;Ax
 	db $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F ; Free Small Key
-	
+
 	db $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49 ; Unused
 	db $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49 ; Unused
 	db $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49, $49 ; Unused
@@ -161,7 +168,7 @@ GetSpritePalette:
 	;--------
 	TAX : LDA .gfxPalettes, X ; look up item gfx
 	PLB : PLX
-	CMP.b #$FA : !BGE .specialHandling
+	CMP.b #$F8 : !BGE .specialHandling
 RTL
 	.specialHandling
 	CMP.b #$FD : BNE ++ ; Progressive Sword
@@ -204,6 +211,11 @@ RTL
 			LDA.b #$02 : RTL
 		+ ; Everything Else
 			LDA.b #$08 : RTL
+	++ : CMP.b #$F8 : BNE ++ ; Progressive Bow
+		LDA $7EF354 : BNE + ; No Bow
+			LDA.b #$08 : RTL
+		+ ; Any Bow
+			LDA.b #$02 : RTL
 	++ : CMP.b #$FA : BNE ++ ; RNG Item (Single)
 		JSL.l GetRNGItemSingle : JMP GetSpritePalette
 	++ : CMP.b #$FB : BNE ++ ; RNG Item (Multi)
@@ -216,20 +228,20 @@ RTL
 	.gfxPalettes
 	db $00, $04, $02, $08, $04, $02, $08, $02
 	db $04, $02, $02, $02, $04, $04, $04, $08
-	
+
 	db $08, $08, $02, $02, $04, $02, $02, $02
 	db $04, $02, $04, $02, $08, $08, $04, $02
-	
+
 	db $0A, $02, $04, $02, $04, $04, $00, $04
 	db $04, $08, $02, $02, $08, $04, $02, $08
-	
+
 	db $04, $04, $08, $08, $08, $04, $02, $08
 	db $02, $04, $08, $02, $04, $04, $02, $02
-	
+
 	db $08, $08, $02, $04, $04, $08, $08, $08
 	db $04, $04, $04, $02, $08, $08, $08, $08
 	; db $04, $0A, $04, $02, $FF, $FF, $FF, $FF
-	
+
 	db $04 ; Safe Master Sword
 	db $08, $08, $08, $08 ; Bomb & Arrow +5/+10
 	db $04, $00, $00 ; Programmable Items 1-3
@@ -239,7 +251,8 @@ RTL
 	db $02, $04, $08 ; Red, Blue & Green Clocks
 	db $FD, $FE, $FF, $FC ; Progressive Sword, Shield, Armor & Gloves
 	db $FA, $FB ; RNG Single & Multi
-	db $00, $00, $00, $00, $00, $00 ; Unused
+	db $F8, $F8 ; Progressive Bow
+	db $00, $00, $00, $00 ; Unused
 	db $08, $08, $08 ; Goal Item Single, Multi & Alt Multi
 	db $00, $00, $00 ; Unused
 	db $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08, $08 ; Free Map
@@ -306,10 +319,10 @@ IsNarrowSprite:
 	++ CMP.b #$63 : BNE ++ ; RNG Item (Multi)
 		JSL.l GetRNGItemMulti
 	++
-	
+
 	.continue
 	;--------
-	
+
 	LDX.b #$00 ; set index counter to 0
 	;----
 	-
@@ -361,7 +374,7 @@ RTL
 ;--------------------------------------------------------------------------------
 LoadDynamicTileOAMTable:
 	PHA : PHP
-	
+
 	PHA
 		REP #$20 ; set 16-bit accumulator
 		LDA.w #$0000 : STA.l !SPRITE_OAM
@@ -369,23 +382,23 @@ LoadDynamicTileOAMTable:
 		LDA.w #$0200 : STA.l !SPRITE_OAM+6
 		SEP #$20 ; set 8-bit accumulator
 		LDA.b #$24 : STA.l !SPRITE_OAM+4
-	
+
 	LDA $01,s
-	
+
 		JSL.l GetSpritePalette
 		STA !SPRITE_OAM+5 : STA !SPRITE_OAM+13
 	PLA
 	JSL.l IsNarrowSprite : BCS .narrow
-	
+
 	BRA .done
-	
+
 	.narrow
 	REP #$20 ; set 16-bit accumulator
 	LDA.w #$0000 : STA.l !SPRITE_OAM+7
 	               STA.l !SPRITE_OAM+14
 	LDA.w #$0800 : STA.l !SPRITE_OAM+9
 	LDA.w #$3400 : STA.l !SPRITE_OAM+11
-	
+
 	.done
 	PLP : PLA
 RTS
@@ -396,25 +409,25 @@ RTS
 ; in:	A - Loot ID
 ; out:  A - OAM Slots Taken
 ;--------------------------------------------------------------------------------
-; This wastes two OAM slots if you don't want a shadow - fix later - I wrote "fix later" over a year ago and it's still not fixed (Aug 6, 2017)
+; This wastes two OAM slots if you don't want a shadow - fix later - I wrote "fix later" over a year ago and it's still not fixed (Aug 6, 2017) - lol (May 25th, 2019)
 ;-------------------------------------------------------------------------------- 2084B8
 !SPRITE_OAM = "$7EC025"
 !SKIP_EOR = "$7F5008"
 ;--------------------------------------------------------------------------------
 DrawDynamicTile:
 	JSL.l IsNarrowSprite : BCS .narrow
-	
+
 	.full
 	LDA.b #$01 : STA $06
 	LDA #$0C : JSL.l OAM_AllocateFromRegionC
 	LDA #$02 : PHA
 	BRA .draw
-	
+
 	.narrow
 	LDA.b #$02 : STA $06
 	LDA #$10 : JSL.l OAM_AllocateFromRegionC
 	LDA #$03 : PHA
-	
+
 	.draw
 	LDA.b #!SPRITE_OAM>>0 : STA $08
 	LDA.b #!SPRITE_OAM>>8 : STA $09
@@ -424,7 +437,7 @@ DrawDynamicTile:
 		JSL Sprite_DrawMultiple_quantity_preset
 		LDA.b #$00 : STA.l !SKIP_EOR
 	PLB
-	
+
 	LDA $90 : !ADD.b #$08 : STA $90 ; leave the pointer in the right spot to draw the shadow, if desired
 	LDA $92 : INC #2 : STA $92
 	PLA
@@ -432,16 +445,16 @@ RTL
 ;--------------------------------------------------------------------------------
 DrawDynamicTileNoShadow:
 	JSL.l IsNarrowSprite : BCS .narrow
-	
+
 	.full
 	LDA.b #$01 : STA $06
 	LDA #$04 : JSL.l OAM_AllocateFromRegionC
 	BRA .draw
-	
+
 	.narrow
 	LDA.b #$02 : STA $06
 	LDA #$08 : JSL.l OAM_AllocateFromRegionC
-	
+
 	.draw
 	LDA.b #!SPRITE_OAM>>0 : STA $08
 	LDA.b #!SPRITE_OAM>>8 : STA $09
@@ -451,7 +464,7 @@ DrawDynamicTileNoShadow:
 		JSL Sprite_DrawMultiple_quantity_preset
 		LDA Bob : BNE + : LDA.b #$00 : STA.l !SKIP_EOR : + ; Bob fix is conditional
 	PLB
-	
+
 	LDA $90 : !ADD.b #$08 : STA $90
 	LDA $92 : INC #2 : STA $92
 RTL
@@ -563,32 +576,159 @@ HexToDec:
 	PHA
 	PHA
 		LDA.w #$9090
-		STA $7F5003 : STA $7F5005 : STA $7F5006 ; clear digit storage
+		STA $04 : STA $06 ; temporarily store our decimal values here for speed
 	PLA
+; as far as i can tell we never convert a value larger than 9999, no point in wasting time on this?
+;	-
+;		CMP.w #10000 : !BLT +
+;		INC $03
+;		!SUB.w #10000 : BRA -
+;	+
 	-
-		CMP.w #10000 : !BLT +
-		PHA : SEP #$20 : LDA $7F5003 : INC : STA $7F5003 : REP #$20 : PLA
-		!SUB.w #10000 : BRA -
-	+ -
 		CMP.w #1000 : !BLT +
-		PHA : SEP #$20 : LDA $7F5004 : INC : STA $7F5004 : REP #$20 : PLA
+		INC $04
 		!SUB.w #1000 : BRA -
 	+ -
 		CMP.w #100 : !BLT +
-		PHA : SEP #$20 : LDA $7F5005 : INC : STA $7F5005 : REP #$20 : PLA
+		INC $05
 		!SUB.w #100 : BRA -
 	+ -
 		CMP.w #10 : !BLT +
-		PHA : SEP #$20 : LDA $7F5006 : INC : STA $7F5006 : REP #$20 : PLA
+		INC $06
 		!SUB.w #10 : BRA -
 	+ -
 		CMP.w #1 : !BLT +
-		PHA : SEP #$20 : LDA $7F5007 : INC : STA $7F5007 : REP #$20 : PLA
+		INC $07
 		!SUB.w #1 : BRA -
-	+ 
+	+
+	LDA.b $04 : STA $7F5004 ; move to digit storage
+	LDA.b $06 : STA $7F5006
 	PLA
+RTL
+
+;--------------------------------------------------------------------------------
+; CountBits
+; in: A(b) - Byte to count bits in
+; out: A(b) - sum of bits
+; caller is responsible for setting 8-bit mode and preserving X and Y
+;--------------------------------------------------------------------------------
+CountBits:
+	PHB : PHK : PLB
+	TAX                     ; Save a copy of value
+	LSR #4                  ; Shift down hi nybble, Leave <3> in C
+	TAY                     ; And save <7:4> in Y
+	TXA                     ; Recover value
+	AND #$07                ; Put out <2:0> in X
+	TAX                     ; And save in X
+	LDA NybbleBitCounts, Y  ; Fetch count for Y
+	ADC NybbleBitCounts, X  ; Add count for X & C
+	PLB
+RTL
+
+; Look up table of bit counts in the values $00-$0F
+NybbleBitCounts:
+db #00, #01, #01, #02, #01, #02, #02, #03, #01, #02, #02, #03, #02, #03, #03, #04
+
+;--------------------------------------------------------------------------------
+
+;--------------------------------------------------------------------------------
+; HexToDec
+; in:	A(w) - Word to Convert
+; out:	$7F5003 - $7F5007 (high - low)
+;--------------------------------------------------------------------------------
+;HexToDec:
+;	PHA
+;	PHA
+;		LDA.w #$9090
+;		STA $7F5003 : STA $7F5005 : STA $7F5006 ; clear digit storage
+;	PLA
+;	-
+;		CMP.w #10000 : !BLT +
+;		PHA : SEP #$20 : LDA $7F5003 : INC : STA $7F5003 : REP #$20 : PLA
+;		!SUB.w #10000 : BRA -
+;	+ -
+;		CMP.w #1000 : !BLT +
+;		PHA : SEP #$20 : LDA $7F5004 : INC : STA $7F5004 : REP #$20 : PLA
+;		!SUB.w #1000 : BRA -
+;	+ -
+;		CMP.w #100 : !BLT +
+;		PHA : SEP #$20 : LDA $7F5005 : INC : STA $7F5005 : REP #$20 : PLA
+;		!SUB.w #100 : BRA -
+;	+ -
+;		CMP.w #10 : !BLT +
+;		PHA : SEP #$20 : LDA $7F5006 : INC : STA $7F5006 : REP #$20 : PLA
+;		!SUB.w #10 : BRA -
+;	+ -
+;		CMP.w #1 : !BLT +
+;		PHA : SEP #$20 : LDA $7F5007 : INC : STA $7F5007 : REP #$20 : PLA
+;		!SUB.w #1 : BRA -
+;	+
+;	PLA
+;RTL
+;--------------------------------------------------------------------------------
+
+;--------------------------------------------------------------------------------
+; WriteVRAMStripe
+; in:	A(w) - VRAM Destination
+; in:	X(w) - Length in Tiles
+; in:	Y(w) - Word to Write
+;--------------------------------------------------------------------------------
+WriteVRAMStripe:
+	PHX
+		LDX $1000 ; get pointer
+		AND.w #$7F : STA $1002, X : INX #2 ; set destination
+	PLA : ASL : AND.w #$7FFF : ORA.w #$7000 : STA $1002, X : INX #2 ; set length and enable RLE
+	TYA : STA $1002, X : INX #2 ; set tile
+	SEP #$20 ; set 8-bit accumulator
+		LDA.b #$FF : STA $1002, X
+		STX $1000
+		LDA.b #01 : STA $14
+	REP #$20 ; set 16-bit accumulator
 RTL
 ;--------------------------------------------------------------------------------
 
+;--------------------------------------------------------------------------------
+; WriteVRAMBlock
+; in:	A(w) - VRAM Destination
+; in:	X(w) - Length in Tiles
+; in:	Y(w) - Address of Data to Copy
+;--------------------------------------------------------------------------------
+WriteVRAMBlock:
+	PHX
+		LDX $1000 ; get pointer
+		AND.w #$7F : STA $1002, X : INX #2 ; set destination
+	PLA : ASL : AND.w #$3FFF : STA $1002, X : INX #2 ; set length
 
+	PHX
+		TYX ; set X to source
+		PHA
+			TXA : !ADD #$1002 : TAY ; set Y to dest
+		PLA
+		;A is already the value we need for mvn
+		MVN $7F7E ; currently we transfer from our buffers in 7F to the vram buffer in 7E
+
+		!ADD 1, s ; add the length in A to the stack pointer on the top of the stack
+	PLX : TAX ; pull and promptly ignore, copying the value we just got over it
+
+	SEP #$20 ; set 8-bit accumulator
+		LDA.b #$FF : STA $1002, X
+		STX $1000
+		LDA.b #01 : STA $14
+	REP #$20 ; set 16-bit accumulator
+RTL
+;--------------------------------------------------------------------------------
+;Byte 1   byte 2  Byte 3   byte 4
+;Evvvvvvv vvvvvvv DRllllll llllllll
+;
+;E if set indicates that this is not a header, but instead is the terminator byte. Only the topmost bit matters in that case.
+;The v's form a vram address.
+;if D is set, the dma will increment the vram address by a row per word, instead of incrementing by a column (1).
+;R if set enables a run length encoding feature
+;the l's are the number of bytes to upload minus 1 (don't forget this -1, it is important)
+;
+;This is then followed by the bytes to upload, in normal format.
+
+;RLE feature:
+;This feature makes it easy to draw the same tile repeatedly. If this bit is set, the length bits should be set to 2 times the number of copies of the tile to upload. (Without subtracting 1!)
+;It is followed by a single tile (word).  Combining this this with the D bit makes it easy to draw large horizontal or vertical runs of a tile without using much space. Geat for erasing or drawing horizontal or verical box edges.
 ;================================================================================

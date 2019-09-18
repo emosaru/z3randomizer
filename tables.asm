@@ -130,7 +130,7 @@ org $308038 ; PC 0x180038 -0x18003A
 LampConeSewers:
 db #$01 ; #$00 = Off - #$01 = On (default)
 LampConeLightWorld:
-db #$01 ; #$00 = Off - #$01 = On (default)
+db #$01 ; #$00 = Off (default) - #$01 = On
 LampConeDarkWorld:
 db #$00 ; #$00 = Off (default) - #$01 = On
 ;--------------------------------------------------------------------------------
@@ -150,8 +150,8 @@ db #$00
 ; #$00 = Off (default)
 ; #$01 = On
 ; #$02 = Require All Dungeons
-; #$03 = Require Crystals and Aga2
-; #$04 = Require Crystals
+; #$03 = Require "NumberOfCrystalsRequiredForGanon" Crystals and Aga2
+; #$04 = Require "NumberOfCrystalsRequiredForGanon" Crystals
 ; #$05 = Require 100 Goal Items
 ;--------------------------------------------------------------------------------
 org $30803F ; PC 0x18003F
@@ -255,7 +255,12 @@ CrystalPendantFlags_2:
 ;Pendant: $00
 ;Crystal: $40
 ;--------------------------------------------------------------------------------
-; 0x18005E - 0x18005F (unused)
+org $30805E ; PC 0x18005E - Number of crystals required to enter GT
+NumberOfCrystalsRequiredForTower:
+db #$07 ; #$07 = 7 Crystals
+org $30805F ; PC 0x18005F - Number of crystals required to kill Ganon
+NumberOfCrystalsRequiredForGanon:
+db #$07 ; #$07 = 7 Crystals
 ;--------------------------------------------------------------------------------
 org $308060 ; PC 0x180060 - 0x18007E
 ProgrammableItemLogicJump_1:
@@ -357,9 +362,25 @@ db #$00 ; $00 = static rng, $01 = no extra blue balls/warps
 ;--------------------------------------------------------------------------------
 org $308087 ; PC 0x180087
 IsEncrypted:
-dw #$0000 ; $0000 = not encrypted, $0001 = encrypted with static key, $0002 = Encrypted w/ passcode entry screen (Not implemented yet)
+dw #$0000 ; $0000 = not encrypted, $0001 = encrypted with static key, $0002 = Encrypted w/ passcode entry screen
 ;--------------------------------------------------------------------------------
-; 0x180089 - 0x18008F (unused)
+org $308089 ; PC 0x180089
+TurtleRockAutoOpenFix:
+db #$00 ; #$00 - Normal, #$01 - Open TR Entrance if exiting from it
+;--------------------------------------------------------------------------------
+org $30808A ; PC 0x18008A
+BlockCastleDoorsInRain:
+db #$00 ; #$00 - Normal, $01 - Block them (Used by Entrance Rando in Standard Mode)
+;--------------------------------------------------------------------------------
+org $30808B ; PC 0x18008B
+PreopenPyramid:
+db $00 ; #$00 = Off (default) - #$01 = On
+;--------------------------------------------------------------------------------
+org $30808C ; PC 0x18008C
+PreopenGanonsTower:
+db $00 ; #$00 = Off (default) - #$01 = On
+;--------------------------------------------------------------------------------
+; 0x18008D - 0x18008F (unused)
 ;--------------------------------------------------------------------------------
 org $308090 ; PC 0x180090 - 0x180097
 ProgressiveSwordLimit:
@@ -378,8 +399,12 @@ BottleLimit:
 db #$04 ; #$04 - 4 Bottles (default)
 BottleLimitReplacement:
 db #$47 ; #$47 - 20 Rupees (default)
+ProgressiveBowLimit:
+db #$02 ; #$02 - 2 Bows (default)
+ProgressiveBowReplacement:
+db #$47 ; #$47 - 20 Rupees (default)
 ;--------------------------------------------------------------------------------
-; 0x180098 - 0x18009F (unused)
+; 0x18009A - 0x18009F (unused)
 ;--------------------------------------------------------------------------------
 org $3080A0 ; PC 0x1800A0 - 0x1800A4
 Bugfix_MirrorlessSQToLW:
@@ -399,7 +424,11 @@ org $3080B0 ; 0x1800B0-0x1800BF
 StaticDecryptionKey:
 dd $00000000, $00000000, $00000000, $00000000
 ;--------------------------------------------------------------------------------
-; 0x1800C0 - 0x1800FF (unused)
+org $3080C0 ; 0x1800C0-0x1800C7 [encrypted]
+KnownEncryptedValue:
+db $31, $41, $59, $26, $53, $58, $97, $93
+;--------------------------------------------------------------------------------
+; 0x1800C8 - 0x1800FF (unused)
 ;--------------------------------------------------------------------------------
 org $308100 ; PC 0x180100 (0x40 bytes)
 ShovelSpawnTable:
@@ -479,7 +508,7 @@ Music_Skull:
 db $16, $16, $16, $16
 
 org $02D592+$76
-Music_Skul_Drop:
+Music_Skull_Drop:
 db $16, $16, $16, $16
 
 org $02D592+$34
@@ -509,10 +538,30 @@ Music_GTower:
 db $16
 
 ;--------------------------------------------------------------------------------
-; OWG EDM bridge sign text pointer (Message id of the map05)
+; OWG EDM bridge sign text pointer (Message id of the upper left of map05 = map05)
 ;--------------------------------------------------------------------------------
 org $07F501
 dw #$018E
+;--------------------------------------------------------------------------------
+; GT sign text pointer (Message id of the upper right of map43 = map44)
+;--------------------------------------------------------------------------------
+org $07F57F
+dw #$0190
+;--------------------------------------------------------------------------------
+; Pyramid sign text pointer (Message id of the upper left of map5B = map5B)
+;--------------------------------------------------------------------------------
+org $07F5AD
+dw #$0191
+;--------------------------------------------------------------------------------
+; HC (inverted) left sign text pointer (Message id of the upper left of map1B = map1B)
+;--------------------------------------------------------------------------------
+org $07F52D
+dw #$0190
+;--------------------------------------------------------------------------------
+; HC (inverted) right sign text pointer (Message id of the upper right of map1B = map1C)
+;--------------------------------------------------------------------------------
+org $07F52F
+dw #$0191
 
 ;--------------------------------------------------------------------------------
 ;Map Pendant / Crystal Indicators
@@ -587,6 +636,7 @@ CrystalPendantFlags:
 ;Crystal 5: $04
 ;Crystal 6: $01
 ;Crystal 7: $08
+;Crystal 8: $80
 ;--------------------------------------------------------------------------------
 ;Dungeons with no drops should match their respective world's normal vanilla prize ;xxx
 ;--------------------------------------------------------------------------------
@@ -671,6 +721,10 @@ org $06C93B ; PC 0x3493B
 PyramidPotion:
 	db #$2C ; #$2C = Green Potion
 ;--------------------------------------------------------------------------------
+; Change track 15 (unused) to point to 13 (Death Mountain) so dark woods can be track 15
+org $1A9F15 ; PC 0xD1F15
+	dw #$2B00	; Set track 15 pointer to track 13's data
+;--------------------------------------------------------------------------------
 org $308140 ; PC 0x180140 - 0x18014A [encrypted]
 HeartPieceOutdoorValues:
 HeartPiece_Spectacle:
@@ -747,11 +801,17 @@ db #$08 ; #$08 = 1 Heart (default) - #$02 = 1/4 Heart
 ;================================================================================
 org $308169 ; PC 0x180169
 AgahnimDoorStyle:
-db #$01 ; #00 = Never Locked - #$01 = Locked During Escape (default)
+db #$02 ; #00 = Never Locked - #$01 = Locked During Escape (default) - #$02 = Locked Without 7 Crystals
 ;================================================================================
 org $30816A ; PC 0x18016A
 FreeItemText:
-db #$00 ; #00 = Off (default) - #$01 = On
+db #$00 ; #00 = Off (default)
+;---o bmcs
+;o - enabled for outside dungeon items
+;b - enabled for inside big key items
+;m - enabled for inside map items
+;c - enabled for inside compass items
+;s - enabled for inside small key items
 ;================================================================================
 org $30816B ; PC 0x18016B - 0x18016D
 HardModeExclusionCaneOfByrnaUsage:
@@ -783,9 +843,9 @@ org $308175 ; PC 0x180175 - 0x180179
 ArrowMode:
 db #$00 ; #00 = Normal (Default) - #$01 = Rupees
 ArrowModeWoodArrowCost: ; keep these together
-dw #$0005 ; #$0005 = 5 (Default)
-ArrowModeSilverArrowCost: ; keep these together
 dw #$000A ; #$000A = 10 (Default)
+ArrowModeSilverArrowCost: ; keep these together
+dw #$0032 ; #$0032 = 50 (Default)
 ;================================================================================
 org $30817A ; PC 0x18017A ; #$2000 for Eastern Palace
 MapReveal_Sahasrahla:
@@ -852,7 +912,15 @@ db #$00 ; #$00 = DNF (Default) - #$01 = Sign Change (Requires TimerRestart == 1)
 TimerRestart:
 db #$00 ; #$00 = Locked (Default) - #$01 = Restart
 ;--------------------------------------------------------------------------------
-; 0x180193 - 0x1801FF (unused)
+org $308193 ; PC 0x180193
+ServerRequestMode:
+db #$00 ; #$00 = Off (Default) - #$01 = Synchronous - #$02 = Asychronous
+;---------------------------------------------------------------------------------
+org $308194 ; PC 0x180194
+TurnInGoalItems:
+db #$01 ; #$00 = Instant win if last goal item collected. $01 = (Default) must turn in goal items
+;--------------------------------------------------------------------------------
+; 0x180195 - 0x1801FF (unused)
 ;================================================================================
 org $308200 ; PC 0x180200 - 0x18020F
 RedClockAmount:
@@ -904,13 +972,76 @@ org $308215 ; PC 0x180215
 SeedHash:
 db $00, $01, $02, $03, $04
 ;--------------------------------------------------------------------------------
-; 0x18021A - 0x18021F (unused)
+org $30821A ; PC 0x18021A
+NoBGM:
+db $00 ; $00 = BGM enabled (default) $01 = BGM disabled
+org $30821B ; PC 0x18021B
+FastFanfare:
+db $00 ; $00 = Normal fanfare (default) $01 = Fast fanfare
+;--------------------------------------------------------------------------------
+; 0x18021C - 0x18021F (unused)
 ;================================================================================
 ; $308220 (0x180220) - $30823F (0x18023F)
 ; Plandomizer Author Name (ASCII) - Leave unused chars as 0
 org $308220 ; PC 0x180220
+;================================================================================
+; $308240 (0x180420) - $308246 (0x180246)
+; For starting areas in single entrance caves, we specify which row in the StartingAreaExitTable
+; to use for exit information. Values are 1 based indexes, with 0 representing a multi-entrance cave
+; start position.
+; Position 0: Link's House
+; Position 1: sanctuary
+; Position 2: Zelda's cell
+; Position 3: Wounded Uncle
+; Position 4: Mantle
+; Position 5: Middle of Old Man Cave
+; Position 6: Old Man's House
+org $308240 ; PC 0x180240
+StartingAreaExitOffset:
+db $00, $00, $00, $00, $00, $00, $00
 ;--------------------------------------------------------------------------------
-; 0x180240 - 0x1814FF (unused)
+org $308247 ; PC 0x180247
+; For any starting areas in single entrance caves you can specify the overworld door here
+; to enable drawing the doorframes These values should be the overworld door index+1.
+; A value of zero will draw no door frame.
+StartingAreaOverworldDoor:
+db $00, $00, $00, $00, $00, $00, $00
+;--------------------------------------------------------------------------------
+; 0x18024E - 0x18024F (unused)
+;-------------------------------------------------------------------------------
+; $308250 (0x180250) - $30829F (0x18029F)
+org $308250 ; PC 0x180250
+StartingAreaExitTable:
+; This has the same format as the main Exit table, except
+; is stored row major instead of column major
+; it lacks the last two columns and has 1 padding byte per row (the last byte)
+dw $0112 : db $53 : dw $001e, $0400, $06e2, $0446, $0758, $046d, $075f : db $00, $00, $00
+dw $0000 : db $00 : dw $0000, $0000, $0000, $0000, $0000, $0000, $0000 : db $00, $00, $00
+dw $0000 : db $00 : dw $0000, $0000, $0000, $0000, $0000, $0000, $0000 : db $00, $00, $00
+dw $0000 : db $00 : dw $0000, $0000, $0000, $0000, $0000, $0000, $0000 : db $00, $00, $00
+;--------------------------------------------------------------------------------
+; 0x1802A0 - 0x1802FF (unused)
+;--------------------------------------------------------------------------------
+; $308300 (0x180300) - $30834F (0x18034F)
+org $308300 ; PC 0x180300
+ExtraHole_Map16:
+dw $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF
+dw $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF
+ExtraHole_Area:
+dw $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF
+dw $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF
+ExtraHole_Entrance:
+db $00, $00, $00, $00, $00, $00, $00, $00
+db $00, $00, $00, $00, $00, $00, $00, $00
+;--------------------------------------------------------------------------------
+; $308350 (0x180350) - $30834F (0x18034F)
+; Correspond to the three start options
+; do not set for a starting location that is using a single entrance cave
+org $308350 ; PC 0x180350
+ShouldStartatExit:
+db $00, $00, $00
+;================================================================================
+; 0x180350 - 0x1814FF (unused)
 ;================================================================================
 ; $309500 (0x181500) - $309FFF (0x181FFF) original 0x39C bytes
 ; Replacement Ending Sequence Text Data
@@ -1148,8 +1279,14 @@ db $04
 ;62:RNG Pool Item (Single)
 ;63:RNG Pool Item (Multi)
 
+;64:Progressive Bow
+;65:Progressive Bow
+
 ;6A:Goal Item (Single/Triforce)
 ;6B:Goal Item (Multi/Power Star)
+
+;6D:Server Request Item
+;6E:Server Request Item (Dungeon Drop)
 
 ;DO NOT PLACE FREE DUNGEON ITEMS WITHIN THEIR OWN DUNGEONS - USE THE NORMAL VARIANTS
 
@@ -1228,6 +1365,9 @@ db $04
 ;db #$F0 ; #$D0 - Light Only (Default), #$F0 - Dark Only
 ;org $06DB78 ; PC 0x35B78 (Bank06.asm:2186) ($24)
 ;db #$8B ; #$24 - Light Style, #$8B - Dark Style
+;;Portal indicator in dark world map
+;org $0ABFBB ; Bank0a.asm:1005 (LDA $008A : CMP.b #$40 : BCS BRANCH_BETA)
+;db $90 ;$90 (BCC) - Show in Dark World, $B0 (BCS) normal
 ;;--------------------------------------------------------------------------------
 ;;Vortexes
 ;org $05AF79 ; PC 0x2AF79 (sprite_warp_vortex.asm:18) (BNE)
@@ -1253,15 +1393,20 @@ db $04
 ;;Residual Portal
 ;org $07A96D ; PC 0x3A96D (Bank07.asm:6578) (BEQ)
 ;db #$D0 ; #$F0 - Light Side (Default), #$D0 - Dark Side
-;org $07A9A7 ; PC 0x3A9A7 (Bank07.asm:6622) (BNE)
-;db #$F0 ; #$D0 - Light Side (Default), #$F0 - Dark Side
-;org $07A9F3 ; PC 0x3A9F3 (Bank07.asm:6677) (BNE)
-;db #$F0 ; #$D0 - Light Side (Default), #$F0 - Dark Side
-;org $07AA3A ; PC 0x3AA3A (Bank07.asm:6718) (BEQ)
-;db #$D0 ; #$F0 - Light Side (Default), #$D0 - Dark Side
 ;;--------------------------------------------------------------------------------
 ;org $08D40C ; PC 0x4540C (ancilla_morph_poof.asm:48) (BEQ)
 ;db #$D0 ; #$F0 - Light Side (Default), #$D0 - Dark Side
+;;--------------------------------------------------------------------------------
+;; Spawn
+; org $0280a6 ; <- Bank02.asm : 257 (LDA $7EF3CA : BEQ .inLightWorld)
+;db #$D0 ; #F0 - default to light (Default), #$D0 - Default to dark
+;;--------------------------------------------------------------------------------
+;org $06B2AA ; <- 332AA sprite_smithy_bros.asm : 152 (JSL Sprite_ShowSolicitedMessageIfPlayerFacing)
+;JSL Sprite_ShowMessageFromPlayerContact ; Inverted uses Sprite_ShowMessageFromPlayerContact
+;;---------------------------------------------------------------------------------
+org $00886e ; <- Bank00.asm : 1050 (LDA Overworld_TileAttr, X)
+LDA Overworld_TileAttr, X ; use "JML InvertedTileAttributeLookup" for inverted
+Overworld_GetTileAttrAtLocation_continue:
 ;================================================================================
 org $0DDBEC ; <- 6DBEC
 dw #10000 ; Rupee Limit +1
@@ -1314,7 +1459,9 @@ dw #9999 ; Rupee Limit
 ; $7F5044 - $7F5046 - NMI Auxiliary Function
 ; $7F5047 - $7F504F - Unused
 ; $7F5050 - $7F506F - Shop Block
-; $7F5070 - $7F507D - Unused
+; $7F5070 - Reserved for OneMind
+; $7F5071 - Reserved for OneMind
+; $7F5072 - $7F507D - Unused
 ; $7F507E - Clock Status
 ; $7F507F - Always Zero
 ; $7F5080 - $7F5083 - Clock Hours
@@ -1332,11 +1479,12 @@ dw #9999 ; Rupee Limit
 ; $7F5098 - Water Entry Index
 ; $7F5099 - Last Entered Overworld Door ID
 ; $7F509A - (Reserved)
-; $7F509B - MSU Flag
+; $7F509B - Unused
 ; $7F509C - Inverted Mode Duck Map Temporary
 ; $7F509D - Stalfos Bomb Damage Value
-
-; $7F50A0 - Event Parameter 1
+; $7F509E - Valid Key Loaded
+; $7F509F - Text Box Defer Flag
+; $7F50A0 - $7F50AF - MSU Block
 
 ; $7F50B0 - $7F50BF - Downstream Reserved (Enemizer)
 
@@ -1345,7 +1493,7 @@ dw #9999 ; Rupee Limit
 ; $7F50C2 - Armor Modifier
 ; $7F50C3 - Magic Modifier
 ; $7F50C4 - Light Cone Modifier
-; $7F50C5 - Cucco Attack Modifier
+; $7F50C5 - Unused
 ; $7F50C6 - Old Man Dash Modifier
 ; $7F50C7 - Ice Physics Modifier
 ; $7F50C8 - Infinite Arrows Modifier
@@ -1359,10 +1507,12 @@ dw #9999 ; Rupee Limit
 ; $7F50D0 - $7F50FF - Block Cypher Parameters
 ; $7F5100 - $7F51FF - Block Cypher Buffer
 ; $7F5200 - $7F52FF - RNG Pointer Block
+; $7F5300 - $7F53FF - Multiworld Block
+
+; $7F5400 - $7F56FF - Unused
 
 ; $7F5700 - $7F57FF - Dialog Buffer
 ;
-; $7F6000 - $7F6FFF - Free RAM (Reclaimed from Damage Table)
 ;================================================================================
 !BIGRAM = "$7EC900";
 ; $7EC900 - Big RAM Buffer ($1F00)
@@ -1424,58 +1574,124 @@ org $30C000 ; PC 0x184000 - 0x184007
 ItemSubstitutionRules:
 ;db [item][quantity][substitution][pad] - CURRENT LIMIT 16 ENTRIES
 db $12, $01, $35, $FF
+db $51, $06, $52, $FF
+db $53, $06, $54, $FF
 db $FF, $FF, $FF, $FF
 ;--------------------------------------------------------------------------------
 ; 0x184008 - 0x1847FF (unused)
 ;================================================================================
-;shop_config - tda- --qq
+;shop_config - tdav --qq
 ; t - 0=Shop - 1=TakeAny
 ; d - 0=Check Door - 1=Skip Door Check
 ; a - 0=Shop/TakeAny - 1=TakeAll
+; v - 0=normal vram, 1= alt vram
 ; qq - # of items for sale
 
-;shopkeeper_config - ppp- --ss
+;shopkeeper_config - ppp- -sss
 ; ppp - palette
-; ss - sprite type
+; sss - sprite type
 org $30C800 ; PC 0x184800 - 0x1848FF - max 32 shops ; do not exceed 36 tracked items sram_index > ($24)
 ShopTable:
 ;db [id][roomID-low][roomID-high][doorID][zero][shop_config][shopkeeper_config][sram_index]
+db $01, $15, $01, $5D, $00, $12, $04, $00
 db $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
-;db $01, $FF, $00, $00, $00, $43, $A0, $00
-;db $02, $0F, $01, $60, $00, $03, $C1, $03
-;db $FF, $12, $01, $58, $00, $81, $E3, $06
-;db $02, $0F, $01, $57, $00, $03, $A0, $09
-;db $03, $0F, $01, $60, $00, $03, $A0, $0c
-;db $04, $0F, $01, $6F, $00, $03, $A0, $0f
-;db $05, $FF, $00, $00, $00, $03, $A0, $12
-;db $06, $1F, $01, $46, $00, $03, $A0, $15
-;db $FF, $12, $01, $58, $00, $03, $A0, $18
+
 org $30C900 ; PC 0x184900 - 0x184FFF - max 224 entries
 ShopContentsTable:
 ;db [id][item][price-low][price-high][max][repl_id][repl_price-low][repl_price-high]
-;db $01, $2E, $96, $00, $00, $FF, $00, $00
-;db $01, $AF, $50, $00, $00, $FF, $00, $00
-;db $01, $31, $32, $00, $00, $FF, $00, $00
-;db $02, $2E, $96, $00, $00, $FF, $00, $00
-;db $02, $AF, $50, $00, $00, $FF, $00, $00
-;db $02, $31, $32, $00, $00, $FF, $00, $00
-;db $FF, $5E, $96, $00, $00, $FF, $00, $00
-;db $FF, $30, $2C, $01, $00, $FF, $00, $00
-;db $FF, $31, $32, $00, $00, $FF, $00, $00
+db $01, $51, $64, $00, $07, $FF, $00, $00
+db $01, $53, $64, $00, $07, $FF, $00, $00
 db $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+
+; Fix spawning with more hearts than capacity when less than 3 heart containers
+LowHeartFix:
+	org $09F4AC ; <- module_death.asm:331
+	db $08, $08, $10
+
 ;================================================================================
-org $30D000 ; PC 0x185000 - 0x18503F
+org $30D000 ; PC 0x185000 - 0x18505F
 MSUTrackList:
 db $00,$01,$03,$03,$03,$03,$03,$03
 db $01,$03,$01,$03,$03,$03,$03,$03
 db $03,$03,$03,$01,$03,$03,$03,$03
 db $03,$03,$03,$03,$03,$01,$03,$03
-db $03,$01,$01,$FF,$FF,$FF,$FF,$FF
-db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+db $03,$01,$01,$03,$03,$03,$03,$03
+db $03,$03,$03,$03,$03,$03,$03,$03
+db $03,$03,$03,$03,$03,$03,$03,$03
+db $03,$03,$03,$03,$03,$00,$00,$00
+
+MSUExtendedFallbackList:
+db $01,$02,$03,$04,$05,$06,$07,$08
+db $09,$0A,$0B,$0C,$0D,$0E,$0D,$10
+db $11,$12,$13,$14,$15,$16,$17,$18
+db $19,$1A,$1B,$1C,$1D,$1E,$1F,$20
+db $21,$22,$11,$11,$10,$16,$16,$16
+db $16,$16,$11,$16,$16,$16,$15,$15
+db $15,$15,$15,$15,$15,$15,$15,$15
+db $15,$15,$16,$02,$09,$00,$00,$00
+
+MSUDungeonFallbackList:
+dw $0000	; Sewer Escape
+dw $0000	; Hyrule Castle
+dw Music_Eastern
+dw Music_Desert
+dw $0000	; Agahnim's Tower
+dw Music_Swamp
+dw Music_Darkness
+dw Music_Mire
+dw Music_Skull
+dw Music_Ice
+dw Music_Hera
+dw Music_Thieves
+dw Music_TRock
+dw Music_GTower
+dw $0000
+dw $0000
+
+SPCMutePayload:
+dw $0001	; Transfer size
+dw $0A4A    ; Transfer destination
+db $00      ; mov a,#$70 -> mov a,#$00
+
+dw $0001    ; Transfer size
+dw $0AF3    ; Transfer destination
+db $00      ; mov $059,#$c0 -> mov $059,#$00
+
+dw $0002    ; Transfer size
+dw $0C32    ; Transfer destination
+db $00, $00 ; movw $058,ya -> nop #2
+
+dw $0001    ; Transfer size
+dw $0D19    ; Transfer destination
+db $34      ; movw $058,ya -> mov $058,a
+
+dw $0000    ; Transfer size (end of transfer)
+dw $FFFF    ; Dummy destination
+db $FF, $FF, $FF, $FF, $FF, $FF, $FF	; Padding
+
+SPCUnmutePayload:
+dw $0001	; Transfer size
+dw $0A4A    ; Transfer destination
+db $70      ; mov a,#$70
+
+dw $0001    ; Transfer size
+dw $0AF3    ; Transfer destination
+db $C0      ; mov $059,#$c0
+
+dw $0002    ; Transfer size
+dw $0C32    ; Transfer destination
+db $da, $58 ; movw $058,ya
+
+dw $0001    ; Transfer size
+dw $0D19    ; Transfer destination
+db $34      ; movw $058,ya
+
+dw $0000    ; Transfer size (end of transfer)
+dw $FFFF    ; Dummy destination
+db $FF, $FF, $FF, $FF, $FF, $FF, $FF	; Padding
+
 ;--------------------------------------------------------------------------------
-; 0x185040 - 1850FF (unused)
+; 0x185060 - 1850FF (unused)
 ;--------------------------------------------------------------------------------
 org $30D100 ; PC 0x185100 - 0x18513F
 UnusedTable: ; please do not move this - kkat
